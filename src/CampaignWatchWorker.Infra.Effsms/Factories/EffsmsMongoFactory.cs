@@ -6,15 +6,18 @@ namespace CampaignWatchWorker.Infra.Effsms.Factories
     public class EffsmsMongoFactory : IEffsmsMongoFactory
     {
         private readonly IMongoDbFactory _factory;
+        private readonly string _databaseName;
 
-        public EffsmsMongoFactory(IMongoDbFactory factory)
+
+        public EffsmsMongoFactory(IMongoDbFactory factory, string databaseName)
         {
             _factory = factory;
+            _databaseName = databaseName;
         }
 
-        public IMongoDatabase GetDatabase(string dbName)
+        public IMongoDatabase GetDatabase()
         {
-            return _factory.GetDatabase("MongoDB.Effsms", dbName);
+            return _factory.GetDatabase("MongoDB.Effsms", _databaseName);
         }
     }
 }

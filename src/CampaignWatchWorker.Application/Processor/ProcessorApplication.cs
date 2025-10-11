@@ -4,7 +4,7 @@
     {
         public void Process(object obj)
         {
-            throw new NotImplementedException();
+            Console.WriteLine("Cheguei");
         }
     }
 }

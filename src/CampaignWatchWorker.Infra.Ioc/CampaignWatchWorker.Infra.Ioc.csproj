@@ -18,9 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Campaign.Watch.Infra.Effmail\CampaignWatchWorker.Infra.Effmail.csproj" />
-    <ProjectReference Include="..\Campaign.Watch.Infra.Effpush\CampaignWatchWorker.Infra.Effpush.csproj" />
-    <ProjectReference Include="..\Campaign.Watch.Infra.Effsms\CampaignWatchWorker.Infra.Effsms.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Application\CampaignWatchWorker.Application.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Campaign\CampaignWatchWorker.Infra.Campaign.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Data\CampaignWatchWorker.Data.csproj" />

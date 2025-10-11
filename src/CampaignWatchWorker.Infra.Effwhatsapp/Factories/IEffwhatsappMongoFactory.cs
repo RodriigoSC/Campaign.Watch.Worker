@@ -4,6 +4,6 @@ namespace CampaignWatchWorker.Infra.Effwhatsapp.Factories
 {
     public interface IEffwhatsappMongoFactory
     {
-        IMongoDatabase GetDatabase(string dbName);
+        IMongoDatabase GetDatabase();
     }
 }

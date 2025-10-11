@@ -15,9 +15,9 @@ namespace CampaignWatchWorker.Infra.Effwhatsapp.Services
             _factory = factory;
         }
 
-        public async Task<IEnumerable<EffwhatsappReadModel>> GetTriggerEffwhatsapp(string dbName, string workflowId)
+        public async Task<IEnumerable<EffwhatsappReadModel>> GetTriggerEffwhatsapp(string workflowId)
         {
-            var database = _factory.GetDatabase(dbName);
+            var database = _factory.GetDatabase();
             var triggerCollection = database.GetCollection<EffwhatsappReadModel>("Trigger");
 
             var pipeline = new BsonDocument[]

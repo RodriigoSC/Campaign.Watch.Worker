@@ -4,6 +4,6 @@ namespace CampaignWatchWorker.Infra.Effpush.Factories
 {
     public interface IEffpushMongoFactory
     {
-        IMongoDatabase GetDatabase(string dbName);
+        IMongoDatabase GetDatabase();
     }
 }

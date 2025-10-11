@@ -15,9 +15,9 @@ namespace CampaignWatchWorker.Infra.Effmail.Services
             _factory = factory;
         }
 
-        public async Task<IEnumerable<EffmailReadModel>> GetTriggerEffmail(string dbName, string workflowId)
+        public async Task<IEnumerable<EffmailReadModel>> GetTriggerEffmail(string workflowId)
         {
-            var database = _factory.GetDatabase(dbName);
+            var database = _factory.GetDatabase();
             var triggerCollection = database.GetCollection<EffmailReadModel>("Trigger");
 
             var pipeline = new BsonDocument[]

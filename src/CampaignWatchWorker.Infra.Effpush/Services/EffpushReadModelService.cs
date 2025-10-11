@@ -15,9 +15,9 @@ namespace CampaignWatchWorker.Infra.Effpush.Services
             _factory = factory;
         }
 
-        public async Task<IEnumerable<EffpushReadModel>> GetTriggerEffpush(string dbName, string workflowId)
+        public async Task<IEnumerable<EffpushReadModel>> GetTriggerEffpush(string workflowId)
         {
-            var database = _factory.GetDatabase(dbName);
+            var database = _factory.GetDatabase();
             var triggerCollection = database.GetCollection<EffpushReadModel>("Trigger");
 
             var pipeline = new BsonDocument[]
