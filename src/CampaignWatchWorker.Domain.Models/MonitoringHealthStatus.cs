@@ -24,6 +24,7 @@ namespace CampaignWatchWorker.Domain.Models
     {
         public DateTime StartDateTime { get; set; }
         public DateTime? EndDateTime { get; set; }
+
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsRecurrent { get; set; }
         public string Crontab { get; set; }
@@ -31,14 +32,14 @@ namespace CampaignWatchWorker.Domain.Models
 
     public class WorkflowStep
     {
-        public string Id { get; set; }
+        public string OriginalStepId { get; set; } // ID do Step no sistema de origem
         public string Name { get; set; }
-        public string Type { get; set; }
+        public string Type { get; set; } // Ex: Filter, Channel, End
         public string Status { get; set; }
         public long TotalUser { get; set; }
         public long TotalExecutionTime { get; set; }
-        public object Error { get; set; } 
-        public string ChannelName { get; set; }
+        public string Error { get; set; } 
+        public string ChannelName { get; set; } 
         public string MonitoringNotes { get; set; }
         public ChannelIntegrationData IntegrationData { get; set; }
     }

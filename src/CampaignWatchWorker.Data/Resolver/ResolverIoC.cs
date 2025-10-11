@@ -1,7 +1,5 @@
 using CampaignWatchWorker.Data.Repositories;
-using CampaignWatchWorker.Data.Services;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CampaignWatchWorker.Data.Resolver
@@ -11,7 +9,8 @@ namespace CampaignWatchWorker.Data.Resolver
         public static IServiceCollection AddRepositoryData(this IServiceCollection services)
         {
             services.AddTransient<ICampaignModelRepository, CampaignModelRepository>();
-            services.AddTransient<ICampaignModelService, CampaignModelService>();
+            services.AddTransient<IExecutionModelRepository, ExecutionModelRepository>();
+
 
             return services;
         }

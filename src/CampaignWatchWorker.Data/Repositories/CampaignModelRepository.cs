@@ -2,7 +2,6 @@
 using CampaignWatchWorker.Data.Repositories.Common;
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
-using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace CampaignWatchWorker.Data.Repositories
@@ -17,7 +16,6 @@ namespace CampaignWatchWorker.Data.Repositories
             var uniqueIndexModel = new CreateIndexModel<CampaignModel>(
                 uniqueIndexKeys,
                 new CreateIndexOptions { Unique = true, Name = "Client_IdCampaign_Unique" });
-
 
             var workerIndexKeys = Builders<CampaignModel>.IndexKeys
                 .Ascending(x => x.IsActive)
@@ -35,10 +33,16 @@ namespace CampaignWatchWorker.Data.Repositories
             return campaignModel;
         }
 
-        public async Task<bool> AtualizarCampanhaAsync(ObjectId id, CampaignModel campaignModel)
-        {
-            var filter = Builders<CampaignModel>.Filter.Eq(c => c.IdCampaign, campaignModel.IdCampaign);
+        
+        public async Task<bool> AtualizarCampanhaAsync(CampaignModel campaignModel)
+        {            
+            var filter = Builders<CampaignModel>.Filter.And(
+                Builders<CampaignModel>.Filter.Eq(c => c.ClientName, campaignModel.ClientName),
+                Builders<CampaignModel>.Filter.Eq(c => c.IdCampaign, campaignModel.IdCampaign)
+            );
+            
             var result = await _collection.ReplaceOneAsync(filter, campaignModel, new ReplaceOptions { IsUpsert = true });
+
             return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
         }
     }

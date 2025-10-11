@@ -2,13 +2,14 @@
     "profiles": {
         "CampaignWatchWorker.Worker": {
             "commandName": "Project",
-            "environmentVariables": {
-              "ASPNETCORE_ENVIRONMENT": "Development",
-              "CONN_STRING_VAULT": "http://192.168.0.3:8200",
-              "USER_VAULT": "monitoring-dev",
-              "PASS_VAULT": "monitoring-dev",
-              "TENANT": "6445d693b443206381ab91c2"
-            }
+          "environmentVariables": {
+            "ASPNETCORE_ENVIRONMENT": "Development",
+            "CONN_STRING_VAULT": "http://192.168.0.3:8200",
+            "USER_VAULT": "monitoring-dev",
+            "PASS_VAULT": "monitoring-dev",
+            "TENANT": "6445d693b443206381ab91c2",
+            "PathLog": "C:\\Users\\rscosta\\Desktop\\LOGS"
+          }
         },
         "Docker": {
             "commandName": "Docker"

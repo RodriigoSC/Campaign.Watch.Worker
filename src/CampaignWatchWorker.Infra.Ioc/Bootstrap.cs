@@ -1,4 +1,5 @@
 ﻿using CampaignWatchWorker.Application.Resolver;
+using CampaignWatchWorker.Application.Services.Interfaces;
 using CampaignWatchWorker.Data.Factories;
 using CampaignWatchWorker.Data.Factories.Common;
 using CampaignWatchWorker.Data.Resolver;
@@ -13,10 +14,15 @@ using CampaignWatchWorker.Infra.Effsms.Factories;
 using CampaignWatchWorker.Infra.Effsms.Resolver;
 using CampaignWatchWorker.Infra.Effwhatsapp.Factories;
 using CampaignWatchWorker.Infra.Effwhatsapp.Resolver;
+using CampaignWatchWorker.Infra.MessageQueue;
 using CampaignWatchWorker.Infra.MultiTenant;
+using Consul;
 using DTM_Consul.Data.Factory;
 using DTM_Consul.Data.KeyValue;
+using DTM_Logging.Ioc;
+using DTM_MessageQueue.RabbitMQ.Consumers;
 using DTM_MessageQueue.RabbitMQ.Factory;
+using DTM_MessageQueue.RabbitMQ.Publishers;
 using DTM_Vault.Data;
 using DTM_Vault.Data.Factory;
 using DTM_Vault.Data.KeyValue;
@@ -34,6 +40,7 @@ namespace CampaignWatchWorker.Infra.Ioc
             var user_vault = ValidateIfNull(Environment.GetEnvironmentVariable("USER_VAULT"), "USER_VAULT");
             var pass_vault = ValidateIfNull(Environment.GetEnvironmentVariable("PASS_VAULT"), "PASS_VAULT");
             var tenantId = ValidateIfNull(Environment.GetEnvironmentVariable("TENANT"), "TENANT");
+            var pathLog = ValidateIfNull(configuration["PathLog"], "pathLog");
 
             services.AddSingleton<IVaultFactory>(_ => VaultFactory.CreateInstance(conn_string_vault, user_vault, pass_vault));
             services.AddTransient<IVaultService, VaultService>();
@@ -51,7 +58,7 @@ namespace CampaignWatchWorker.Infra.Ioc
             services.AddSingleton<ITenant>(sp =>
             {
                 var consulKvRepository = sp.GetRequiredService<IKVRepository>();
-                var tenantResult = consulKvRepository.Get<Tenant>($"tenants/{tenantId}").GetAwaiter().GetResult();
+                var tenantResult = consulKvRepository.Get<Tenant>(tenantId).GetAwaiter().GetResult();
                 return TenantResolver.SetupTenant(tenantResult);
             });
 
@@ -92,6 +99,13 @@ namespace CampaignWatchWorker.Infra.Ioc
 
                 return DTM_RabbitMqFactory.CreateInstance($@"amqp://{rabbitUser?.Result}:{x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.pass")?.Result}@{rabbitHost?.Result}/{rabbitVirtualhost?.Result}".ToString());
             });
+
+            services.AddTransient<IQueueEventHandler, QueueEventHandler>();
+            services.AddTransient<IDTM_RabbitMqConsumer, DTM_RabbitMqConsumer>();
+            services.AddTransient<IDTM_RabbitMqPublisher, DTM_RabbitMqPublisher>();
+
+            services.AddFileLogger(pathLog, applicationName, environment);
+
         }
 
         private static string ValidateIfNull(string? value, string? name)

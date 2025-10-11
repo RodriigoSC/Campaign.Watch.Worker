@@ -31,9 +31,9 @@ namespace CampaignWatchWorker.Domain.Models
 
         public DateTime ModifiedAt { get; set; }
 
-        public CampaignStatusEnum StatusCampaign { get; set; } 
+        public CampaignStatusEnum StatusCampaign { get; set; }
 
-        public MonitoringStatusEnum MonitoringStatus { get; set; } 
+        public MonitoringStatusEnum MonitoringStatus { get; set; }
         public DateTime? NextExecutionMonitoring { get; set; }
 
         public DateTime? LastCheckMonitoring { get; set; }
