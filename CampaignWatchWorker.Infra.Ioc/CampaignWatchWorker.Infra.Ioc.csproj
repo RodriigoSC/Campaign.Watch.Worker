@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DTM_Consul.Data" Version="1.1.0" />
+    <PackageReference Include="DTM_Logging" Version="1.0.5" />
+    <PackageReference Include="DTM_MessageQueue.RabbitMQ" Version="1.1.0" />
+    <PackageReference Include="DTM_Repository.Data.MongoDb" Version="1.3.2" />
+    <PackageReference Include="DTM_Vault.Data" Version="1.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Campaign.Watch.Infra.Effmail\CampaignWatchWorker.Infra.Effmail.csproj" />
+    <ProjectReference Include="..\Campaign.Watch.Infra.Effpush\CampaignWatchWorker.Infra.Effpush.csproj" />
+    <ProjectReference Include="..\Campaign.Watch.Infra.Effsms\CampaignWatchWorker.Infra.Effsms.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Application\CampaignWatchWorker.Application.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Campaign\CampaignWatchWorker.Infra.Campaign.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Data\CampaignWatchWorker.Data.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effmail\CampaignWatchWorker.Infra.Effmail.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effpush\CampaignWatchWorker.Infra.Effpush.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effsms\CampaignWatchWorker.Infra.Effsms.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effwhatsapp\CampaignWatchWorker.Infra.Effwhatsapp.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Infra.MessageQueue\CampaignWatchWorker.Infra.MessageQueue.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Infra.MultiTenant\CampaignWatchWorker.Infra.MultiTenant.csproj" />
+  </ItemGroup>
+
+</Project>

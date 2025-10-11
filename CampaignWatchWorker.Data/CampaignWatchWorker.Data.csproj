@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CampaignWatchWorker.Application\CampaignWatchWorker.Application.csproj" />
+    <ProjectReference Include="..\CampaignWatchWorker.Domain.Models\CampaignWatchWorker.Domain.Models.csproj" />
+    <PackageReference Include="DTM_Vault.Data" Version="1.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageReference Include="MongoDB.Driver" Version="2.26.0" />
+  </ItemGroup>
+
+</Project>
