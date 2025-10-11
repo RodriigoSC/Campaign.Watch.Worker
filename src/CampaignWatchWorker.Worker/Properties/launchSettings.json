@@ -3,10 +3,11 @@
         "CampaignWatchWorker.Worker": {
             "commandName": "Project",
             "environmentVariables": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                "CONN_STRING_VAULT": "",
-                "USER_VAULT": "",
-                "PASS_VAULT": ""
+              "ASPNETCORE_ENVIRONMENT": "Development",
+              "CONN_STRING_VAULT": "",
+              "USER_VAULT": "",
+              "PASS_VAULT": "",
+              "TENANT": ""
             }
         },
         "Docker": {

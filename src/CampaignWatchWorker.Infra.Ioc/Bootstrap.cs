@@ -13,6 +13,7 @@ using CampaignWatchWorker.Infra.Effsms.Factories;
 using CampaignWatchWorker.Infra.Effsms.Resolver;
 using CampaignWatchWorker.Infra.Effwhatsapp.Factories;
 using CampaignWatchWorker.Infra.Effwhatsapp.Resolver;
+using DTM_MessageQueue.RabbitMQ.Factory;
 using DTM_Vault.Data;
 using DTM_Vault.Data.Factory;
 using DTM_Vault.Data.KeyValue;
@@ -26,16 +27,26 @@ namespace CampaignWatchWorker.Infra.Ioc
     {
         public static async Task StartIoC(IServiceCollection services, IConfiguration configuration, string applicationName)
         {
-            // Valida e obtém as variáveis de ambiente necessárias para a conexão com o Vault e para definir o ambiente.
+            var environment = ValidateIfNull(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "ASPNETCORE_ENVIRONMENT");
+            var conn_string_vault = ValidateIfNull(Environment.GetEnvironmentVariable("CONN_STRING_VAULT"), "CONN_STRING_VAULT");
             var user_vault = ValidateIfNull(Environment.GetEnvironmentVariable("USER_VAULT"), "USER_VAULT");
             var pass_vault = ValidateIfNull(Environment.GetEnvironmentVariable("PASS_VAULT"), "PASS_VAULT");
-            var conn_string_vault = ValidateIfNull(Environment.GetEnvironmentVariable("CONN_STRING_VAULT"), "CONN_STRING_VAULT");
-            var environment = ValidateIfNull(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "ASPNETCORE_ENVIRONMENT");
+            var tenantId = ValidateIfNull(Environment.GetEnvironmentVariable("TENANT"), "tenant");
 
             // Configura o serviço e a fábrica do Vault como Singleton.
             services.AddSingleton<IVaultFactory>(_ =>
                 VaultFactory.CreateInstance(conn_string_vault, user_vault, pass_vault));
             services.AddTransient<IVaultService, VaultService>();
+
+            services.AddSingleton(x =>
+            {
+                var rabbitHost = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.host");
+                var rabbitUser = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.user");
+                var rabbitVirtualhost = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.virtualhost");
+
+                return DTM_RabbitMqFactory.CreateInstance($@"amqp://{rabbitUser?.Result}:{x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.pass")?.Result}@{rabbitHost?.Result}/{rabbitVirtualhost?.Result}".ToString());
+            });
+
 
             // Registra a fábrica genérica de MongoDB como Singleton.
             services.AddSingleton<IMongoDbFactory>(sp =>

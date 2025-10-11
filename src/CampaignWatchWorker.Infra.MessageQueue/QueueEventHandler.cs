@@ -60,7 +60,7 @@ namespace CampaignWatchWorker.Infra.MessageQueue
 
         public void Get(Action<object?, object?> action)
         {
-            _rabbitMqConsumer.Register(_tenant.QueueNameProcessorLeads, new EventHandler<BasicDeliverEventArgs>((model, ea) =>
+            _rabbitMqConsumer.Register(_tenant.QueueNameMonitoring, new EventHandler<BasicDeliverEventArgs>((model, ea) =>
             {
                 _fileLogger.Log("Buscando item da fila...", projectId: _tenant.Id, projectName: _tenant.Name);
                 var channel = ((EventingBasicConsumer)model).Model;
@@ -68,7 +68,7 @@ namespace CampaignWatchWorker.Infra.MessageQueue
                 {
                     var messageBodyString = Encoding.UTF8.GetString(ea.Body);
 
-                    var messageToLog = $"Mensagem recebida da fila \"{_tenant.QueueNameProcessorLeads}\": {messageBodyString}";
+                    var messageToLog = $"Mensagem recebida da fila \"{_tenant.QueueNameMonitoring}\": {messageBodyString}";
                     _fileLogger.Log(messageToLog, projectId: _tenant.Id, projectName: _tenant.Name);
 
                     Console.WriteLine(messageToLog);
