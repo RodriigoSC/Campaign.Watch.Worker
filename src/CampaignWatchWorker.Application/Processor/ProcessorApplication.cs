@@ -1,8 +1,6 @@
 ﻿using CampaignWatchWorker.Application.Mappers;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
-using System;
-using System.Linq;
 
 namespace CampaignWatchWorker.Application.Processor
 {

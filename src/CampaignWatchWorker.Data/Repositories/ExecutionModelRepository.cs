@@ -2,7 +2,6 @@
 using CampaignWatchWorker.Data.Repositories.Common;
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
-using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace CampaignWatchWorker.Data.Repositories

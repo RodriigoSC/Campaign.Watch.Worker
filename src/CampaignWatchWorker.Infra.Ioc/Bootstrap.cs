@@ -16,7 +16,6 @@ using CampaignWatchWorker.Infra.Effwhatsapp.Factories;
 using CampaignWatchWorker.Infra.Effwhatsapp.Resolver;
 using CampaignWatchWorker.Infra.MessageQueue;
 using CampaignWatchWorker.Infra.MultiTenant;
-using Consul;
 using DTM_Consul.Data.Factory;
 using DTM_Consul.Data.KeyValue;
 using DTM_Logging.Ioc;
@@ -58,7 +57,7 @@ namespace CampaignWatchWorker.Infra.Ioc
             services.AddSingleton<ITenant>(sp =>
             {
                 var consulKvRepository = sp.GetRequiredService<IKVRepository>();
-                var tenantResult = consulKvRepository.Get<Tenant>(tenantId).GetAwaiter().GetResult();
+                var tenantResult = consulKvRepository.Get<Tenant>($"Monitoring/{tenantId}").GetAwaiter().GetResult();
                 return TenantResolver.SetupTenant(tenantResult);
             });
 
