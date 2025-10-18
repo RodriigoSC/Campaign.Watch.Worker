@@ -1,3 +1,4 @@
+using CampaignWatchWorker.Application.Analyzer;
 using CampaignWatchWorker.Application.Mappers;
 using CampaignWatchWorker.Application.Processor;
 using CampaignWatchWorker.Application.QueueEventHandler;
@@ -10,22 +11,23 @@ namespace CampaignWatchWorker.Application.Resolver
     {
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
-            // Processamento
+            // Processors
             services.AddTransient<IProcessorApplication, ProcessorApplication>();
+
+            // Queue Event Handlers
             services.AddTransient<IQueueEventHandlerApplication, QueueEventHandlerApplication>();
 
-            // Mapeamento
+            // Mappers
             services.AddTransient<ICampaignMapper, CampaignMapper>();
 
-            // Análise de saúde
+            // Health Analyzers
             services.AddTransient<ICampaignHealthAnalyzer, CampaignHealthAnalyzer>();
 
-            // Validadores de Steps
+            // Step Validators
             services.AddTransient<IStepValidator, FilterStepValidator>();
             services.AddTransient<IStepValidator, ChannelStepValidator>();
-            services.AddTransient<IStepValidator, EndStepValidator>();
-
             services.AddTransient<IStepValidator, WaitStepValidator>();
+            services.AddTransient<IStepValidator, EndStepValidator>();
 
             return services;
         }
