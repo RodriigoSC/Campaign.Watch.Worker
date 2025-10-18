@@ -11,6 +11,9 @@ namespace CampaignWatchWorker.Domain.Models.Enums
         [Description("Canal de Comunicação")]
         Channel,
 
+        [Description("Espera")]
+        Wait,
+
         [Description("Fim da Jornada")]
         End,
     }
