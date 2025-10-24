@@ -36,6 +36,7 @@ namespace CampaignWatchWorker.Domain.Models
         public string Name { get; set; }
         public string Type { get; set; } // Ex: Filter, Channel, End
         public string Status { get; set; }
+        //public DateTime StartDate { get; set; }
         public long TotalUser { get; set; }
         public long TotalExecutionTime { get; set; }
         public string Error { get; set; } 

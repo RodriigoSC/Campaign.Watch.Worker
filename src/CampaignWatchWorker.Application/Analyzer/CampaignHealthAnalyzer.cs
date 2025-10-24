@@ -2,7 +2,7 @@
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Diagnostics;
 using CampaignWatchWorker.Domain.Models.Enums;
-using Microsoft.Extensions.Logging;
+//using Microsoft.Extensions.Logging;
 
 namespace CampaignWatchWorker.Application.Analyzer
 {
@@ -13,11 +13,11 @@ namespace CampaignWatchWorker.Application.Analyzer
     public class CampaignHealthAnalyzer : ICampaignHealthAnalyzer
     {
         private readonly Dictionary<WorkflowStepTypeEnum, IStepValidator> _validators;
-        private readonly ILogger<CampaignHealthAnalyzer> _logger;
+        //private readonly ILogger<CampaignHealthAnalyzer> _logger;
 
-        public CampaignHealthAnalyzer(IEnumerable<IStepValidator> validators,ILogger<CampaignHealthAnalyzer> logger)
+        public CampaignHealthAnalyzer(IEnumerable<IStepValidator> validators/*, ILogger<CampaignHealthAnalyzer> logger*/)
         {
-            _logger = logger;
+            //_logger = logger;
             _validators = validators.ToDictionary(v => v.SupportedStepType, v => v);
         }
 
@@ -49,7 +49,7 @@ namespace CampaignWatchWorker.Application.Analyzer
                         {
                             // Validação genérica se não houver validador específico
                             stepDiag = CreateGenericStepDiagnostic(step);
-                            _logger.LogWarning($"Nenhum validador encontrado para o tipo de step: {stepType}");
+                            //_logger.LogWarning($"Nenhum validador encontrado para o tipo de step: {stepType}");
                         }
                     }
                     else
@@ -77,7 +77,7 @@ namespace CampaignWatchWorker.Application.Analyzer
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Erro ao analisar execução {execution.OriginalExecutionId}");
+                //_logger.LogError(ex, $"Erro ao analisar execução {execution.OriginalExecutionId}");
                 diagnostic.OverallHealth = HealthStatusEnum.Error;
                 diagnostic.Summary = $"Erro durante análise: {ex.Message}";
             }
@@ -156,7 +156,7 @@ namespace CampaignWatchWorker.Application.Analyzer
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Erro ao analisar saúde da campanha {campaign.IdCampaign}");
+                //_logger.LogError(ex, $"Erro ao analisar saúde da campanha {campaign.IdCampaign}");
                 healthStatus.HasIntegrationErrors = true;
                 healthStatus.LastMessage = $"Erro na análise de saúde: {ex.Message}";
             }

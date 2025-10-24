@@ -64,8 +64,8 @@ namespace CampaignWatchWorker.Application.Mappers
 
             var executionModel = CreateExecutionModel(executionRead, campaignMonitoringId);
             executionModel.Steps = MapWorkflowSteps(executionRead.WorkflowExecution, executionRead.ExecutionId);
-            executionModel.HasMonitoringErrors = executionModel.Steps.Any(s =>
-                !string.IsNullOrEmpty(s.MonitoringNotes) || !string.IsNullOrEmpty(s.Error));
+            /*executionModel.HasMonitoringErrors = executionModel.Steps.Any(s =>
+                !string.IsNullOrEmpty(s.MonitoringNotes) || !string.IsNullOrEmpty(s.Error));*/
 
             return executionModel;
         }
@@ -304,7 +304,7 @@ namespace CampaignWatchWorker.Application.Mappers
                 Name = type.GetProperty("Name")?.GetValue(fileInfo) as string,
                 StartedAt = (DateTime?)type.GetProperty("StartedAt")?.GetValue(fileInfo),
                 FinishedAt = (DateTime?)type.GetProperty("FinishedAt")?.GetValue(fileInfo),
-                Total = (int)type.GetProperty("Total")?.GetValue(fileInfo)!
+                Total = (long)type.GetProperty("Total")?.GetValue(fileInfo)!
             };
         }
     }

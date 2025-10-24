@@ -2,6 +2,7 @@
 using CampaignWatchWorker.Data.Repositories.Common;
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace CampaignWatchWorker.Data.Repositories
@@ -32,7 +33,7 @@ namespace CampaignWatchWorker.Data.Repositories
             return executionModel;
         }
 
-        public async Task<bool> AtualizarExecucaoAsync(ExecutionModel executionModel)
+        /*public async Task<bool> AtualizarExecucaoAsync(ExecutionModel executionModel)
         {
             var filter = Builders<ExecutionModel>.Filter.And(
                 Builders<ExecutionModel>.Filter.Eq(e => e.OriginalCampaignId, executionModel.OriginalCampaignId),
@@ -40,6 +41,34 @@ namespace CampaignWatchWorker.Data.Repositories
             );
 
             var result = await _collection.ReplaceOneAsync(filter, executionModel, new ReplaceOptions { IsUpsert = true });
+            return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
+        }*/
+
+        public async Task<bool> AtualizarExecucaoAsync(ExecutionModel executionModel)
+        {
+            var filter = Builders<ExecutionModel>.Filter.And(
+                Builders<ExecutionModel>.Filter.Eq(e => e.OriginalCampaignId, executionModel.OriginalCampaignId),
+                Builders<ExecutionModel>.Filter.Eq(e => e.OriginalExecutionId, executionModel.OriginalExecutionId)
+            );
+
+            var updateDefinition = Builders<ExecutionModel>.Update
+                .Set(x => x.CampaignName, executionModel.CampaignName)
+                .Set(x => x.Status, executionModel.Status)
+                .Set(x => x.StartDate, executionModel.StartDate)
+                .Set(x => x.EndDate, executionModel.EndDate)
+                .Set(x => x.TotalDurationInSeconds, executionModel.TotalDurationInSeconds)
+                .Set(x => x.HasMonitoringErrors, executionModel.HasMonitoringErrors)
+                .Set(x => x.Steps, executionModel.Steps)
+
+                .SetOnInsert(x => x.Id, ObjectId.GenerateNewId())
+                .SetOnInsert(x => x.CampaignMonitoringId, executionModel.CampaignMonitoringId)
+                .SetOnInsert(x => x.OriginalCampaignId, executionModel.OriginalCampaignId)
+                .SetOnInsert(x => x.OriginalExecutionId, executionModel.OriginalExecutionId);
+
+            var options = new UpdateOptions { IsUpsert = true };
+
+            var result = await _collection.UpdateOneAsync(filter, updateDefinition, options);
+
             return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
         }
     }

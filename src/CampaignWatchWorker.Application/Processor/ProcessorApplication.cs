@@ -1,12 +1,12 @@
 ﻿// CampaignWatchWorker.Application/Processor/ProcessorApplication.cs
+using CampaignWatchWorker.Application.Analyzer;
 using CampaignWatchWorker.Application.Mappers;
-using CampaignWatchWorker.Application.Services;
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Diagnostics;
 using CampaignWatchWorker.Domain.Models.Enums;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
-using Microsoft.Extensions.Logging;
+//using Microsoft.Extensions.Logging;
 
 namespace CampaignWatchWorker.Application.Processor
 {
@@ -17,22 +17,22 @@ namespace CampaignWatchWorker.Application.Processor
         private readonly IExecutionModelRepository _executionModelRepository;
         private readonly ICampaignMapper _campaignMapper;
         private readonly ICampaignHealthAnalyzer _healthAnalyzer;
-        private readonly ILogger<ProcessorApplication> _logger;
+        //private readonly ILogger<ProcessorApplication> _logger;
 
         public ProcessorApplication(
             ICampaignReadModelService campaignReadModelService,
             ICampaignModelRepository campaignModelRepository,
             IExecutionModelRepository executionModelRepository,
             ICampaignMapper campaignMapper,
-            ICampaignHealthAnalyzer healthAnalyzer,
-            ILogger<ProcessorApplication> logger)
+            ICampaignHealthAnalyzer healthAnalyzer/*,
+            ILogger<ProcessorApplication> logger*/)
         {
             _campaignReadModelService = campaignReadModelService;
             _campaignModelRepository = campaignModelRepository;
             _executionModelRepository = executionModelRepository;
             _campaignMapper = campaignMapper;
             _healthAnalyzer = healthAnalyzer;
-            _logger = logger;
+            //_logger = logger;
         }
 
         public void Process(object obj)
@@ -43,17 +43,17 @@ namespace CampaignWatchWorker.Application.Processor
                 campaignId = obj?.ToString();
                 if (string.IsNullOrEmpty(campaignId))
                 {
-                    _logger.LogWarning("ID da Campanha nulo ou vazio. Mensagem ignorada.");
+                    //_logger.LogWarning("ID da Campanha nulo ou vazio. Mensagem ignorada.");
                     return;
                 }
 
-                _logger.LogInformation($"Iniciando processamento para a Campanha ID: {campaignId}");
+                //_logger.LogInformation($"Iniciando processamento para a Campanha ID: {campaignId}");
 
                 // 1. Buscar dados da campanha
                 var campaignReadModel = _campaignReadModelService.GetCampaignById(campaignId).GetAwaiter().GetResult();
                 if (campaignReadModel == null)
                 {
-                    _logger.LogWarning($"Campanha com ID {campaignId} não encontrada no sistema de origem.");
+                    //_logger.LogWarning($"Campanha com ID {campaignId} não encontrada no sistema de origem.");
                     return;
                 }
 
@@ -76,18 +76,22 @@ namespace CampaignWatchWorker.Application.Processor
                             // Analisar saúde da execução
                             var diagnostic = _healthAnalyzer.AnalyzeExecutionAsync(executionModel, campaignModel).GetAwaiter().GetResult();
 
+                            // Define se há erros com base no resultado da análise
+                            executionModel.HasMonitoringErrors = diagnostic.OverallHealth == HealthStatusEnum.Error ||
+                                                                 diagnostic.OverallHealth == HealthStatusEnum.Critical;
+
                             // Log do diagnóstico
-                            LogExecutionDiagnostic(diagnostic, executionModel);
+                            //LogExecutionDiagnostic(diagnostic, executionModel);
 
                             // Persistir execução
                             _executionModelRepository.AtualizarExecucaoAsync(executionModel).GetAwaiter().GetResult();
                             executionModels.Add(executionModel);
 
-                            _logger.LogInformation($"Execução {executionModel.OriginalExecutionId} processada. Status: {diagnostic.Summary}");
+                            //_logger.LogInformation($"Execução {executionModel.OriginalExecutionId} processada. Status: {diagnostic.Summary}");
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, $"Erro ao processar a execução ID: {executionRead.ExecutionId}");
+                            //_logger.LogError(ex, $"Erro ao processar a execução ID: {executionRead.ExecutionId}");
                             continue;
                         }
                     }
@@ -105,17 +109,17 @@ namespace CampaignWatchWorker.Application.Processor
                 _campaignModelRepository.AtualizarCampanhaAsync(campaignModel).GetAwaiter().GetResult();
 
                 // 6. Log final
-                LogCampaignSummary(campaignModel, campaignHealth, executionModels.Count);
+                //LogCampaignSummary(campaignModel, campaignHealth, executionModels.Count);
 
-                _logger.LogInformation($"Campanha '{campaignModel.Name}' processada com sucesso.");
+                //_logger.LogInformation($"Campanha '{campaignModel.Name}' processada com sucesso.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"ERRO FATAL ao processar a mensagem para a Campanha ID: {campaignId}");
+                //_logger.LogError(ex, $"ERRO FATAL ao processar a mensagem para a Campanha ID: {campaignId}");
             }
         }
 
-        private void LogExecutionDiagnostic(ExecutionDiagnostic diagnostic, ExecutionModel execution)
+        /*private void LogExecutionDiagnostic(ExecutionDiagnostic diagnostic, ExecutionModel execution)
         {
             var logLevel = diagnostic.OverallHealth switch
             {
@@ -135,9 +139,9 @@ namespace CampaignWatchWorker.Application.Processor
                     $"  Step '{stepDiag.StepName}' ({stepDiag.StepId}): {stepDiag.Message}"
                 );
             }
-        }
+        }*/
 
-        private void LogCampaignSummary(CampaignModel campaign, MonitoringHealthStatus health, int executionCount)
+        /*private void LogCampaignSummary(CampaignModel campaign, MonitoringHealthStatus health, int executionCount)
         {
             var campaignType = campaign.CampaignType == CampaignTypeEnum.Pontual ? "Pontual" : "Recorrente";
 
@@ -160,7 +164,7 @@ namespace CampaignWatchWorker.Application.Processor
 
             _logger.LogInformation($"Próxima verificação agendada para: {campaign.NextExecutionMonitoring:dd/MM/yyyy HH:mm}");
             _logger.LogInformation($"========================");
-        }
+        }*/
 
         private DateTime? CalculateNextCheck(CampaignModel campaign)
         {
@@ -234,7 +238,7 @@ namespace CampaignWatchWorker.Application.Processor
             return now.AddMinutes(30);
         }
 
-        private LogLevel ConvertHealthToLogLevel(HealthStatusEnum health)
+        /*private LogLevel ConvertHealthToLogLevel(HealthStatusEnum health)
         {
             return health switch
             {
@@ -243,6 +247,6 @@ namespace CampaignWatchWorker.Application.Processor
                 HealthStatusEnum.Warning => LogLevel.Warning,
                 _ => LogLevel.Information
             };
-        }
+        }*/
     }
 }
