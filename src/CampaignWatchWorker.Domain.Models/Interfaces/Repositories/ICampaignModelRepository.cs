@@ -6,5 +6,7 @@ namespace CampaignWatchWorker.Domain.Models.Interfaces.Repositories
     {
         Task<CampaignModel> CriarCampanhaAsync(CampaignModel campaignModel);
         Task<bool> AtualizarCampanhaAsync(CampaignModel campaignModel);
+
+        Task<CampaignModel?> ObterCampanhaPorIdAsync(string clientName, string idCampaign);
     }
 }
