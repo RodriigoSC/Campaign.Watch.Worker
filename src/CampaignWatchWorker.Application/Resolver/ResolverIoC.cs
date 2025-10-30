@@ -1,7 +1,6 @@
 using CampaignWatchWorker.Application.Analyzer;
 using CampaignWatchWorker.Application.Mappers;
 using CampaignWatchWorker.Application.Processor;
-using CampaignWatchWorker.Application.QueueEventHandler;
 using CampaignWatchWorker.Application.Validators;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,9 +12,6 @@ namespace CampaignWatchWorker.Application.Resolver
         {
             // Processors
             services.AddTransient<IProcessorApplication, ProcessorApplication>();
-
-            // Queue Event Handlers
-            services.AddTransient<IQueueEventHandlerApplication, QueueEventHandlerApplication>();
 
             // Mappers
             services.AddTransient<ICampaignMapper, CampaignMapper>();

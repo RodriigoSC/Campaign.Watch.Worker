@@ -1,10 +1,6 @@
 ﻿using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Enums;
 using CampaignWatchWorker.Domain.Models.Interfaces;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Effmail;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Effpush;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Effsms;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Effwhatsapp;
 using CampaignWatchWorker.Domain.Models.Read.Campaign;
 using MongoDB.Bson;
 using Newtonsoft.Json;
@@ -13,25 +9,11 @@ namespace CampaignWatchWorker.Application.Mappers
 {
     public class CampaignMapper : ICampaignMapper
     {
-        private readonly ITenant _tenant;
-        private readonly Dictionary<ChannelTypeEnum, Func<string, Task<ChannelIntegrationData>>> _channelFetchers;
+        private readonly ITenantContext _tenantContext;
 
-        public CampaignMapper(
-            ITenant tenant,
-            IEffmailReadModelService effmailReadModelService,
-            IEffsmsReadModelService effsmsReadModelService,
-            IEffpushReadModelService effpushReadModelService,
-            IEffwhatsappReadModelService effwhatsappReadModelService)
+        public CampaignMapper(ITenantContext tenantContext)
         {
-            _tenant = tenant ?? throw new ArgumentNullException(nameof(tenant));
-
-            _channelFetchers = new Dictionary<ChannelTypeEnum, Func<string, Task<ChannelIntegrationData>>>
-            {
-                [ChannelTypeEnum.EffectiveMail] = workflowId => FetchEffmailDataAsync(workflowId, effmailReadModelService),
-                [ChannelTypeEnum.EffectiveSms] = workflowId => FetchEffsmsDataAsync(workflowId, effsmsReadModelService),
-                [ChannelTypeEnum.EffectivePush] = workflowId => FetchEffpushDataAsync(workflowId, effpushReadModelService),
-                [ChannelTypeEnum.EffectiveWhatsApp] = workflowId => FetchEffwhatsappDataAsync(workflowId, effwhatsappReadModelService)
-            };
+            _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         }
 
         public CampaignModel MapToCampaignModel(CampaignReadModel campaignReadModel)
@@ -40,7 +22,7 @@ namespace CampaignWatchWorker.Application.Mappers
 
             return new CampaignModel
             {
-                ClientName = _tenant.Name,
+                ClientName = _tenantContext.Client.Name,
                 IdCampaign = campaignReadModel.Id,
                 Name = campaignReadModel.Name,
                 NumberId = campaignReadModel.NumberId,
@@ -58,14 +40,12 @@ namespace CampaignWatchWorker.Application.Mappers
             };
         }
 
-        public ExecutionModel MapToExecutionModel(ExecutionReadModel executionRead, ObjectId campaignMonitoringId)
+        public ExecutionModel MapToExecutionModel(ExecutionReadModel executionRead, ObjectId campaignMonitoringId, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             if (executionRead == null) return null!;
 
             var executionModel = CreateExecutionModel(executionRead, campaignMonitoringId);
-            executionModel.Steps = MapWorkflowSteps(executionRead.WorkflowExecution, executionRead.ExecutionId);
-            /*executionModel.HasMonitoringErrors = executionModel.Steps.Any(s =>
-                !string.IsNullOrEmpty(s.MonitoringNotes) || !string.IsNullOrEmpty(s.Error));*/
+            executionModel.Steps = MapWorkflowSteps(executionRead.WorkflowExecution, executionRead.ExecutionId, channelData);
 
             return executionModel;
         }
@@ -90,26 +70,24 @@ namespace CampaignWatchWorker.Application.Mappers
             };
         }
 
-        private List<WorkflowStep> MapWorkflowSteps(IEnumerable<WorkflowExecutionReadModel> workflows, ObjectId executionId)
+        private List<WorkflowStep> MapWorkflowSteps(IEnumerable<WorkflowExecutionReadModel> workflows, ObjectId executionId, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             var steps = new List<WorkflowStep>();
-
             foreach (var workflow in workflows)
             {
                 if (Enum.TryParse<WorkflowStepTypeEnum>(workflow.Type, true, out var stepType))
                 {
-                    var step = MapWorkflowStep(workflow, stepType);
+                    var step = MapWorkflowStep(workflow, stepType, channelData);
                     steps.Add(step);
                 }
             }
-
             return steps;
         }
 
-        private WorkflowStep MapWorkflowStep(WorkflowExecutionReadModel workflow, WorkflowStepTypeEnum stepType)
+        private WorkflowStep MapWorkflowStep(WorkflowExecutionReadModel workflow, WorkflowStepTypeEnum stepType, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             var step = CreateBaseWorkflowStep(workflow, stepType);
-            EnrichWorkflowStep(step, workflow, stepType);
+            EnrichWorkflowStep(step, workflow, stepType, channelData);
             return step;
         }
 
@@ -127,18 +105,16 @@ namespace CampaignWatchWorker.Application.Mappers
             };
         }
 
-        private void EnrichWorkflowStep(WorkflowStep step, WorkflowExecutionReadModel workflow, WorkflowStepTypeEnum stepType)
+        private void EnrichWorkflowStep(WorkflowStep step, WorkflowExecutionReadModel workflow, WorkflowStepTypeEnum stepType, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             switch (stepType)
             {
                 case WorkflowStepTypeEnum.Filter:
                     HandleFilterStep(step, workflow);
                     break;
-
                 case WorkflowStepTypeEnum.Channel:
-                    HandleChannelStep(step, workflow);
+                    HandleChannelStep(step, workflow, channelData);
                     break;
-
                 case WorkflowStepTypeEnum.End:
                     step.MonitoringNotes = "Etapa final da jornada.";
                     break;
@@ -156,16 +132,31 @@ namespace CampaignWatchWorker.Application.Mappers
             }
         }
 
-        private void HandleChannelStep(WorkflowStep step, WorkflowExecutionReadModel workflow)
+        private void HandleChannelStep(WorkflowStep step, WorkflowExecutionReadModel workflow, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             if (!TryGetChannelType(workflow, out var channelType))
             {
                 step.MonitoringNotes = "ERRO: Etapa do tipo Canal, mas não foi possível identificar o canal específico.";
                 return;
             }
-
             step.ChannelName = channelType.ToString();
-            step.IntegrationData = FetchChannelDataAsync(channelType, workflow.Id.ToString()).GetAwaiter().GetResult();
+
+            if (channelData.TryGetValue(step.OriginalStepId, out var consolidatedData))
+            {
+                step.IntegrationData = new ChannelIntegrationData
+                {
+                    ChannelName = consolidatedData.Channel,
+                    IntegrationStatus = consolidatedData.StatusTrigger,
+                    TemplateId = null,
+                    Raw = JsonConvert.SerializeObject(consolidatedData),
+                    Leads = MapLeadsData(consolidatedData.TotalStatus),
+                    File = null
+                };
+            }
+            else
+            {
+                step.MonitoringNotes = "AVISO: Dados de integração do canal não encontrados na coleção consolidada.";
+            }
         }
 
         private bool TryGetChannelType(WorkflowExecutionReadModel workflow, out ChannelTypeEnum channelType)
@@ -175,96 +166,7 @@ namespace CampaignWatchWorker.Application.Mappers
             return workflow.ExecutionData != null &&
                    workflow.ExecutionData.Contains("ChannelName") &&
                    Enum.TryParse(workflow.ExecutionData["ChannelName"].AsString, out channelType);
-        }
-
-        private async Task<ChannelIntegrationData> FetchChannelDataAsync(ChannelTypeEnum channelType, string workflowId)
-        {
-            if (_channelFetchers.TryGetValue(channelType, out var fetcher))
-            {
-                try
-                {
-                    return await fetcher(workflowId);
-                }
-                catch
-                {
-                    return null!;
-                }
-            }
-
-            return null!;
-        }
-
-        private async Task<ChannelIntegrationData> FetchEffmailDataAsync(
-            string workflowId,
-            IEffmailReadModelService service)
-        {
-            var trigger = (await service.GetTriggerEffmail(workflowId)).FirstOrDefault();
-            if (trigger == null) return null!;
-
-            return new ChannelIntegrationData
-            {
-                ChannelName = ChannelTypeEnum.EffectiveMail.ToString(),
-                IntegrationStatus = trigger.Status,
-                TemplateId = trigger.TemplateId,
-                Raw = JsonConvert.SerializeObject(trigger),
-                Leads = MapLeadsData(trigger.Leads),
-                File = MapFileInfoData(trigger.File)
-            };
-        }
-
-        private async Task<ChannelIntegrationData> FetchEffsmsDataAsync(
-            string workflowId,
-            IEffsmsReadModelService service)
-        {
-            var trigger = (await service.GetTriggerEffsms(workflowId)).FirstOrDefault();
-            if (trigger == null) return null!;
-
-            return new ChannelIntegrationData
-            {
-                ChannelName = ChannelTypeEnum.EffectiveSms.ToString(),
-                IntegrationStatus = trigger.Status,
-                TemplateId = trigger.TemplateId,
-                Raw = JsonConvert.SerializeObject(trigger),
-                Leads = MapLeadsData(trigger.Leads),
-                File = MapFileInfoData(trigger.File)
-            };
-        }
-
-        private async Task<ChannelIntegrationData> FetchEffpushDataAsync(
-            string workflowId,
-            IEffpushReadModelService service)
-        {
-            var trigger = (await service.GetTriggerEffpush(workflowId)).FirstOrDefault();
-            if (trigger == null) return null!;
-
-            return new ChannelIntegrationData
-            {
-                ChannelName = ChannelTypeEnum.EffectivePush.ToString(),
-                IntegrationStatus = trigger.Status,
-                TemplateId = trigger.TemplateId,
-                Raw = JsonConvert.SerializeObject(trigger),
-                Leads = MapLeadsData(trigger.Leads),
-                File = MapFileInfoData(trigger.File)
-            };
-        }
-
-        private async Task<ChannelIntegrationData> FetchEffwhatsappDataAsync(
-            string workflowId,
-            IEffwhatsappReadModelService service)
-        {
-            var trigger = (await service.GetTriggerEffwhatsapp(workflowId)).FirstOrDefault();
-            if (trigger == null) return null!;
-
-            return new ChannelIntegrationData
-            {
-                ChannelName = ChannelTypeEnum.EffectiveWhatsApp.ToString(),
-                IntegrationStatus = trigger.Status,
-                TemplateId = trigger.TemplateId,
-                Raw = JsonConvert.SerializeObject(trigger),
-                Leads = MapLeadsData(trigger.Leads),
-                File = MapFileInfoData(trigger.Archive)
-            };
-        }
+        }        
 
         private Domain.Models.Scheduler MapScheduler(SchedulerReadModel scheduler)
         {
@@ -279,32 +181,19 @@ namespace CampaignWatchWorker.Application.Mappers
             };
         }
 
-        private LeadsData MapLeadsData<T>(T leads) where T : class
+        private LeadsData MapLeadsData(ChannelTotalStatus totalStatus)
         {
-            if (leads == null) return null!;
+            if (totalStatus == null) return null!;
 
-            var type = typeof(T);
+            int totalError = (totalStatus.TotalError ?? 0) + (totalStatus.TotalFail ?? 0);
+
             return new LeadsData
             {
-                Success = (int)type.GetProperty("Success")?.GetValue(leads)!,
-                Error = (int)type.GetProperty("Error")?.GetValue(leads)!,
-                Blocked = (int)type.GetProperty("Blocked")?.GetValue(leads)!,
-                Optout = (int)type.GetProperty("Optout")?.GetValue(leads)!,
-                Deduplication = (int)type.GetProperty("Deduplication")?.GetValue(leads)!
-            };
-        }
-
-        private FileInfoData MapFileInfoData<T>(T fileInfo) where T : class
-        {
-            if (fileInfo == null) return null!;
-
-            var type = typeof(T);
-            return new FileInfoData
-            {
-                Name = type.GetProperty("Name")?.GetValue(fileInfo) as string,
-                StartedAt = (DateTime?)type.GetProperty("StartedAt")?.GetValue(fileInfo),
-                FinishedAt = (DateTime?)type.GetProperty("FinishedAt")?.GetValue(fileInfo),
-                Total = (long)type.GetProperty("Total")?.GetValue(fileInfo)!
+                Success = totalStatus.TotalSuccess ?? 0,
+                Error = totalError,
+                Blocked = totalStatus.TotalBlocked ?? 0,
+                Optout = totalStatus.TotalOptout ?? 0,
+                Deduplication = totalStatus.TotalDeduplication ?? 0
             };
         }
     }

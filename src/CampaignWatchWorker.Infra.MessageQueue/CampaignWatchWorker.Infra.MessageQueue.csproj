@@ -15,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CampaignWatchWorker.Domain.Models\CampaignWatchWorker.Domain.Models.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Application\CampaignWatchWorker.Application.csproj" />
   </ItemGroup>
 

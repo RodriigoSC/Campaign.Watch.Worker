@@ -7,14 +7,9 @@ namespace CampaignWatchWorker.Application.Mappers
 {
     public interface ICampaignMapper
     {
-        /// <summary>
-        /// Mapeia o modelo de leitura de campanha para o modelo de domínio de monitoramento.
-        /// </summary>
         CampaignModel MapToCampaignModel(CampaignReadModel campaignReadModel);
 
-        /// <summary>
-        /// Mapeia o modelo de leitura de execução para o modelo de domínio de monitoramento.
-        /// </summary>
-        ExecutionModel MapToExecutionModel(ExecutionReadModel executionReadModel, ObjectId campaignMonitoringId);
+        ExecutionModel MapToExecutionModel(ExecutionReadModel executionReadModel, ObjectId campaignMonitoringId,
+            Dictionary<string, ConsolidatedChannelReadModel> channelData);
     }
 }

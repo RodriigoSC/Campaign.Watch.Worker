@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CampaignWatchWorker.Data\CampaignWatchWorker.Data.csproj" />
-    <ProjectReference Include="..\CampaignWatchWorker.Domain.Models\CampaignWatchWorker.Domain.Models.csproj" />
   </ItemGroup>
 
 </Project>

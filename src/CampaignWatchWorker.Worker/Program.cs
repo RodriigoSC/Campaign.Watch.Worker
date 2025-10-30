@@ -2,6 +2,7 @@
 using CampaignWatchWorker.Infra.Ioc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace CampaignWatchWorker.Worker
 {
@@ -10,38 +11,38 @@ namespace CampaignWatchWorker.Worker
         public static async Task Main(string[] args)
         {
             var environment = ValidateIfNull(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "enviromentName");
-
             Console.WriteLine($"ASPNETCORE_ENVIRONMENT: {environment}");
 
-            var services = new ServiceCollection();
-            var configurationBuilder = new ConfigurationBuilder();
+            var builder = new HostBuilder()
+                .ConfigureAppConfiguration((hostContext, config) =>
+                {
+                    config.SetBasePath(AppContext.BaseDirectory)
+                        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                        .AddJsonFile($"appsettings.{environment}.json", true, true)
+                        .AddEnvironmentVariables();
+                })
+                .ConfigureServices(async (hostContext, services) =>
+                {
+                    var configuration = hostContext.Configuration;
 
-            var builder = configurationBuilder
-                .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{environment}.json", true, true)
-                .AddEnvironmentVariables();
+                    services.AddSingleton<IConfiguration>(configuration);
 
-            IConfigurationRoot configuration = builder.Build();
+                    await Bootstrap.StartIoC(services, configuration, Assembly.GetExecutingAssembly().GetName().Name);
 
-            services.AddSingleton<IConfiguration>(provider => configuration);
-            services.AddScoped<Consumer>();
+                    services.AddHostedService<MultiTenantPollingWorker>();
+                });
 
-            await Bootstrap.StartIoC(services, configuration, Assembly.GetExecutingAssembly().GetName().Name);
+            await builder.RunConsoleAsync();
 
-            var servicesProvider = services.BuildServiceProvider();
-
-            servicesProvider.GetService<Consumer>()?.Start();
-            Console.ReadLine();
             Console.WriteLine("Parando excecução...");
+        }
 
-            string ValidateIfNull(string? value, string? name)
-            {
-                if (string.IsNullOrEmpty(value))
-                    throw new ArgumentNullException($"{name} cannot be null");
+        private static string ValidateIfNull(string? value, string? name)
+        {
+            if (string.IsNullOrEmpty(value))
+                throw new ArgumentNullException($"{name} cannot be null");
 
-                return value;
-            }
+            return value;
         }
     }
 }

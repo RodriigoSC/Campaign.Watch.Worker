@@ -37,7 +37,6 @@ namespace CampaignWatchWorker.Domain.Models
 
         public Scheduler Scheduler { get; set; }
 
-        // NOVOS CAMPOS:
         public int TotalExecutionsProcessed { get; set; }
         public int ExecutionsWithErrors { get; set; }
         public DateTime? FirstMonitoringAt { get; set; }

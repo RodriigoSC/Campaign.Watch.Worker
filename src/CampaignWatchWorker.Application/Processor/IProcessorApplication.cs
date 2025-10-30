@@ -2,6 +2,6 @@
 {
     public interface IProcessorApplication
     {
-        void Process(object obj);
+        Task ProcessDueCampaignsForClientAsync();
     }
 }

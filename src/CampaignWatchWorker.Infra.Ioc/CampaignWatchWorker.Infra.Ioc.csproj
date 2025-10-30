@@ -21,11 +21,6 @@
     <ProjectReference Include="..\CampaignWatchWorker.Application\CampaignWatchWorker.Application.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Campaign\CampaignWatchWorker.Infra.Campaign.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Data\CampaignWatchWorker.Data.csproj" />
-    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effmail\CampaignWatchWorker.Infra.Effmail.csproj" />
-    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effpush\CampaignWatchWorker.Infra.Effpush.csproj" />
-    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effsms\CampaignWatchWorker.Infra.Effsms.csproj" />
-    <ProjectReference Include="..\CampaignWatchWorker.Infra.Effwhatsapp\CampaignWatchWorker.Infra.Effwhatsapp.csproj" />
-    <ProjectReference Include="..\CampaignWatchWorker.Infra.MessageQueue\CampaignWatchWorker.Infra.MessageQueue.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Infra.MultiTenant\CampaignWatchWorker.Infra.MultiTenant.csproj" />
   </ItemGroup>
 

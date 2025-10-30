@@ -93,5 +93,18 @@ namespace CampaignWatchWorker.Data.Repositories
             );
             return await _collection.FindAsync(filter).Result.FirstOrDefaultAsync();
         }
+
+        public async Task<IEnumerable<CampaignModel>> ObterCampanhasDevidasParaClienteAsync(string clientName)
+        {
+            var now = DateTime.UtcNow;
+            var filter = Builders<CampaignModel>.Filter.And(
+                Builders<CampaignModel>.Filter.Eq(x => x.ClientName, clientName),
+                Builders<CampaignModel>.Filter.Eq(x => x.IsActive, true),
+                Builders<CampaignModel>.Filter.Eq(x => x.IsDeleted, false),
+                Builders<CampaignModel>.Filter.Lte(x => x.NextExecutionMonitoring, now)
+            );
+
+            return await _collection.Find(filter).ToListAsync();
+        }
     }
 }
