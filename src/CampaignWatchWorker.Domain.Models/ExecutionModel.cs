@@ -12,9 +12,9 @@ namespace CampaignWatchWorker.Domain.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public ObjectId CampaignMonitoringId { get; set; }
 
-        public string OriginalCampaignId { get; set; } 
+        public string OriginalCampaignId { get; set; }
 
-        public string OriginalExecutionId { get; set; } 
+        public string OriginalExecutionId { get; set; }
 
         public string CampaignName { get; set; }
 

@@ -4,7 +4,7 @@ using System.Reflection;
 namespace CampaignWatchWorker.Domain.Models.Extensions
 {
     public static class EnumExtensions
-    {        
+    {
         public static string GetDescription(this Enum value)
         {
             var field = value.GetType().GetField(value.ToString());

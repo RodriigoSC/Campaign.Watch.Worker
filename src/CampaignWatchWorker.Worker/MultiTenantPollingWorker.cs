@@ -11,8 +11,11 @@ namespace CampaignWatchWorker.Worker
     {
         private readonly ILogger<MultiTenantPollingWorker> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly IClientConfigService _clientConfigService; 
-        private readonly TimeSpan _pollingInterval = TimeSpan.FromMinutes(1);
+        private readonly IClientConfigService _clientConfigService;
+
+        private readonly TimeSpan _healthCheckInterval = TimeSpan.FromMinutes(1);
+        private readonly TimeSpan _discoveryInterval = TimeSpan.FromMinutes(15);
+        private DateTime _lastDiscoveryRun = DateTime.MinValue;
 
         public MultiTenantPollingWorker(ILogger<MultiTenantPollingWorker> logger, IServiceScopeFactory scopeFactory, IClientConfigService clientConfigService)
         {
@@ -24,36 +27,51 @@ namespace CampaignWatchWorker.Worker
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("Multi-Tenant Polling Worker iniciado.");
+            Console.WriteLine("Multi-Tenant Polling Worker iniciado.");
+
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await ProcessAllClientsAsync(stoppingToken);
+                    if (DateTime.UtcNow - _lastDiscoveryRun > _discoveryInterval)
+                    {
+                        _logger.LogInformation("Iniciando ciclo de DESCOBERTA de campanhas...");
+                        Console.WriteLine("Iniciando ciclo de DESCOBERTA de campanhas...");
+                        await ProcessAllClientsDiscoveryAsync(stoppingToken);
+                        _lastDiscoveryRun = DateTime.UtcNow;
+                        _logger.LogInformation("Ciclo de DESCOBERTA de campanhas finalizado.");
+                        Console.WriteLine("Ciclo de DESCOBERTA de campanhas finalizado.");
+                    }
+
+                    _logger.LogInformation("Iniciando ciclo de MONITORAMENTO de saúde...");
+                    Console.WriteLine("Iniciando ciclo de MONITORAMENTO de saúde...");
+                    await ProcessAllClientsHealthCheckAsync(stoppingToken);
+                    _logger.LogInformation("Ciclo de MONITORAMENTO de saúde finalizado.");
+                    Console.WriteLine("Ciclo de MONITORAMENTO de saúde finalizado.");
+
                 }
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Erro fatal no loop de processamento principal.");
+                    Console.WriteLine($"Erro fatal no loop de processamento principal: {ex}");
                 }
 
-                await Task.Delay(_pollingInterval, stoppingToken);
+                await Task.Delay(_healthCheckInterval, stoppingToken);
             }
         }
 
-        private async Task ProcessAllClientsAsync(CancellationToken stoppingToken)
+        private async Task ProcessAllClientsHealthCheckAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Buscando clientes ativos...");
             var activeClients = await _clientConfigService.GetAllActiveClientsAsync();
-
             if (!activeClients.Any())
             {
-                _logger.LogWarning("Nenhum cliente ativo encontrado na configuração.");
+                _logger.LogWarning("[HealthCheck] Nenhum cliente ativo encontrado.");
+                Console.WriteLine("[HealthCheck] Nenhum cliente ativo encontrado.");
                 return;
             }
 
-            _logger.LogInformation($"Encontrados {activeClients.Count} clientes ativos. Iniciando processamento paralelo.");
-
-            // Processa clientes em paralelo
             var options = new ParallelOptions
             {
                 MaxDegreeOfParallelism = Environment.ProcessorCount,
@@ -62,31 +80,70 @@ namespace CampaignWatchWorker.Worker
 
             await Parallel.ForEachAsync(activeClients, options, async (client, token) =>
             {
-                _logger.LogInformation("[{ClientName}] Iniciando verificação.", client.Name);
+                _logger.LogInformation("[HealthCheck][{ClientName}] Iniciando verificação de saúde.", client.Name);
+                Console.WriteLine($"[HealthCheck][{client.Name}] Iniciando verificação de saúde.");
                 try
                 {
-                    // Cria um escopo de DI para este cliente
                     using (var scope = _scopeFactory.CreateScope())
                     {
-                        // Configura o contexto do tenant para este escopo
                         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
                         tenantContext.SetClient(client);
 
-                        // Obtém o processador (que agora usará o TenantContext)
                         var processor = scope.ServiceProvider.GetRequiredService<IProcessorApplication>();
 
-                        // Processa todas as campanhas devidas para este cliente
                         await processor.ProcessDueCampaignsForClientAsync();
                     }
-                    _logger.LogInformation("[{ClientName}] Verificação concluída.", client.Name);
+                    _logger.LogInformation("[HealthCheck][{ClientName}] Verificação de saúde concluída.", client.Name);
+                    Console.WriteLine($"[HealthCheck][{client.Name}] Verificação de saúde concluída.");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "[{ClientName}] Falha ao processar cliente.", client.Name);
+                    _logger.LogError(ex, "[HealthCheck][{ClientName}] Falha ao processar cliente.", client.Name);
+                    Console.WriteLine($"[HealthCheck][{client.Name}] Falha ao processar cliente: {ex}");
                 }
             });
+        }
 
-            _logger.LogInformation("Ciclo de processamento de todos os clientes finalizado.");
+        private async Task ProcessAllClientsDiscoveryAsync(CancellationToken stoppingToken)
+        {
+            var activeClients = await _clientConfigService.GetAllActiveClientsAsync();
+            if (!activeClients.Any())
+            {
+                _logger.LogWarning("[Discovery] Nenhum cliente ativo encontrado.");
+                Console.WriteLine("[Discovery] Nenhum cliente ativo encontrado.");
+                return;
+            }
+
+            var options = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = stoppingToken
+            };
+
+            await Parallel.ForEachAsync(activeClients, options, async (client, token) =>
+            {
+                _logger.LogInformation("[Discovery][{ClientName}] Iniciando descoberta de campanhas.", client.Name);
+                Console.WriteLine($"[Discovery][{client.Name}] Iniciando descoberta de campanhas.");
+                try
+                {
+                    using (var scope = _scopeFactory.CreateScope())
+                    {
+                        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+                        tenantContext.SetClient(client);
+
+                        var processor = scope.ServiceProvider.GetRequiredService<IProcessorApplication>();
+
+                        await processor.DiscoverNewCampaignsAsync();
+                    }
+                    _logger.LogInformation("[Discovery][{ClientName}] Descoberta de campanhas concluída.", client.Name);
+                    Console.WriteLine($"[Discovery][{client.Name}] Descoberta de campanhas concluída.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Discovery][{ClientName}] Falha ao descobrir campanhas.", client.Name);
+                    Console.WriteLine($"[Discovery][{client.Name}] Falha ao descobrir campanhas: {ex}");
+                }
+            });
         }
     }
 }

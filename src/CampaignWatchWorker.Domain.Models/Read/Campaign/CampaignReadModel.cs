@@ -5,46 +5,46 @@ namespace CampaignWatchWorker.Domain.Models.Read.Campaign
 {
     [BsonIgnoreExtraElements]
     public class CampaignReadModel
-    {        
+    {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         [BsonElement("_id")]
         public string Id { get; set; }
-        
+
         [BsonElement("NumberId")]
         public long NumberId { get; set; }
-        
+
         [BsonElement("Name")]
         public string Name { get; set; }
-        
+
         [BsonElement("Type")]
         public int Type { get; set; }
 
         [BsonElement("Description")]
         public string Description { get; set; }
-        
+
         [BsonElement("ProjectId")]
         public string ProjectId { get; set; }
-        
+
         [BsonElement("IsActive")]
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsActive { get; set; }
-        
+
         [BsonElement("CreatedAt")]
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
         public DateTime CreatedAt { get; set; }
-        
+
         [BsonElement("ModifiedAt")]
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
         public DateTime ModifiedAt { get; set; }
-        
+
         [BsonElement("Status")]
         public int Status { get; set; }
-        
+
         [BsonElement("IsDeleted")]
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsDeleted { get; set; }
-       
+
         [BsonElement("IsRestored")]
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsRestored { get; set; }
@@ -73,7 +73,7 @@ namespace CampaignWatchWorker.Domain.Models.Read.Campaign
 
     [BsonIgnoreExtraElements]
     public class JourneyReadModel
-    {        
+    {
         [BsonElement("Workflow")]
         public List<WorkflowReadModel> Workflow { get; set; }
     }

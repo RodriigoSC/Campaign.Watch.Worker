@@ -3,7 +3,7 @@
 namespace CampaignWatchWorker.Domain.Models.Enums
 {
     public enum CampaignTypeEnum
-    {        
+    {
         [Description("Pontual")]
         Pontual = 0,
 

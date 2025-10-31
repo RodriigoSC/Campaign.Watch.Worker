@@ -8,7 +8,7 @@ namespace CampaignWatchWorker.Application.Validators
     {
         public WorkflowStepTypeEnum SupportedStepType => WorkflowStepTypeEnum.End;
 
-        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step,ExecutionModel execution,CampaignModel campaign)
+        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
         {
             var diagnostic = new StepDiagnostic
             {
@@ -17,7 +17,6 @@ namespace CampaignWatchWorker.Application.Validators
                 DetectedAt = DateTime.UtcNow
             };
 
-            // 1. Verificar erro explícito
             if (!string.IsNullOrEmpty(step.Error))
             {
                 diagnostic.DiagnosticType = DiagnosticTypeEnum.StepFailed;
@@ -27,7 +26,6 @@ namespace CampaignWatchWorker.Application.Validators
                 return diagnostic;
             }
 
-            // 2. Verificar consistência de status
             if (step.Status == "Completed" && execution.Status != "Completed")
             {
                 diagnostic.DiagnosticType = DiagnosticTypeEnum.IncompleteExecution;

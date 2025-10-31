@@ -15,7 +15,7 @@ namespace CampaignWatchWorker.Domain.Models.Enums
 
         [Description("EffectiveWhatsApp")]
         EffectiveWhatsApp = 5,
-  
+
         [Description("EffectiveApi")]
         EffectiveApi = 6
     }

@@ -166,7 +166,7 @@ namespace CampaignWatchWorker.Application.Mappers
             return workflow.ExecutionData != null &&
                    workflow.ExecutionData.Contains("ChannelName") &&
                    Enum.TryParse(workflow.ExecutionData["ChannelName"].AsString, out channelType);
-        }        
+        }
 
         private Domain.Models.Scheduler MapScheduler(SchedulerReadModel scheduler)
         {

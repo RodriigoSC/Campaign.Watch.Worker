@@ -15,7 +15,7 @@ namespace CampaignWatchWorker.Domain.Models.Enums
         InProgress,
 
         [Description("Concluído")]
-        Concluded,       
+        Concluded,
 
         [Description("Erro")]
         Error

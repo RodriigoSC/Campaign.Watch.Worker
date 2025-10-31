@@ -1,8 +1,8 @@
-﻿using System.Reflection;
-using CampaignWatchWorker.Infra.Ioc;
+﻿using CampaignWatchWorker.Infra.Ioc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Reflection;
 
 namespace CampaignWatchWorker.Worker
 {

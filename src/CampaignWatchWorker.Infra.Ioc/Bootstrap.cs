@@ -3,7 +3,7 @@ using CampaignWatchWorker.Data.Factories;
 using CampaignWatchWorker.Data.Factories.Common;
 using CampaignWatchWorker.Data.Resolver;
 using CampaignWatchWorker.Data.Services;
-using CampaignWatchWorker.Domain.Models.Interfaces; 
+using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
 using CampaignWatchWorker.Infra.Campaign.Factories;
@@ -47,14 +47,14 @@ namespace CampaignWatchWorker.Infra.Ioc
                 var dbName = vaultService.GetKeyAsync($"monitoring/{environment}/data/keys", "MongoDB.Persistence.database").GetAwaiter().GetResult();
                 return new PersistenceMongoFactory(mongoFactory, dbName);
             });
-            
+
             services.AddScoped<ICampaignMongoFactory, CampaignMongoFactory>();
-            
+
             services.AddSingleton<IClientConfigService, ClientConfigService>();
 
             services.AddScoped<IChannelReadModelService, ChannelReadModelService>();
 
-            services.AddRepositoryData(); 
+            services.AddRepositoryData();
 
             services.AddCampaignRepository();
 

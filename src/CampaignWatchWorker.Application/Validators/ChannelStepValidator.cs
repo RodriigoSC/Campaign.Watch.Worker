@@ -12,7 +12,7 @@ namespace CampaignWatchWorker.Application.Validators
         private const double WarningErrorRate = 0.2;  // 20%
         private static readonly TimeSpan FileProcessingTimeout = TimeSpan.FromHours(1);
 
-        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step,ExecutionModel execution,CampaignModel campaign)
+        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
         {
             var diagnostic = new StepDiagnostic
             {

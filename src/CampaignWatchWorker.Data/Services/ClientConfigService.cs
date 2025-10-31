@@ -8,7 +8,7 @@ namespace CampaignWatchWorker.Data.Services
 {
     public class ClientConfigService : IClientConfigService
     {
-        private readonly IPersistenceMongoFactory _persistenceFactory; 
+        private readonly IPersistenceMongoFactory _persistenceFactory;
         private readonly ILogger<ClientConfigService> _logger;
 
         public ClientConfigService(IPersistenceMongoFactory persistenceFactory, ILogger<ClientConfigService> logger)

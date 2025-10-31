@@ -5,7 +5,7 @@ namespace CampaignWatchWorker.Domain.Models.Enums
 {
     public enum CampaignStatusEnum
     {
-        
+
         [Description("Rascunho")]
         Draft = 0,
 

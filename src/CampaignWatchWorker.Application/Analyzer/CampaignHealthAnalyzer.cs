@@ -2,22 +2,18 @@
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Diagnostics;
 using CampaignWatchWorker.Domain.Models.Enums;
-//using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace CampaignWatchWorker.Application.Analyzer
 {
-    /// <summary>
-    /// Serviço responsável por analisar a saúde de campanhas e suas execuções.
-    /// Utiliza validadores específicos para cada tipo de step e consolida os diagnósticos.
-    /// </summary>
     public class CampaignHealthAnalyzer : ICampaignHealthAnalyzer
     {
         private readonly Dictionary<WorkflowStepTypeEnum, IStepValidator> _validators;
-        //private readonly ILogger<CampaignHealthAnalyzer> _logger;
+        private readonly ILogger<CampaignHealthAnalyzer> _logger;
 
-        public CampaignHealthAnalyzer(IEnumerable<IStepValidator> validators/*, ILogger<CampaignHealthAnalyzer> logger*/)
+        public CampaignHealthAnalyzer(IEnumerable<IStepValidator> validators, ILogger<CampaignHealthAnalyzer> logger)
         {
-            //_logger = logger;
+            _logger = logger;
             _validators = validators.ToDictionary(v => v.SupportedStepType, v => v);
         }
 
@@ -32,29 +28,24 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             try
             {
-                // Analisar cada step da execução
                 foreach (var step in execution.Steps)
                 {
                     StepDiagnostic stepDiag;
 
-                    // Tentar parsear o tipo do step
                     if (Enum.TryParse<WorkflowStepTypeEnum>(step.Type, true, out var stepType))
                     {
-                        // Usar validador específico se disponível
                         if (_validators.TryGetValue(stepType, out var validator))
                         {
                             stepDiag = await validator.ValidateAsync(step, execution, campaign);
                         }
                         else
                         {
-                            // Validação genérica se não houver validador específico
                             stepDiag = CreateGenericStepDiagnostic(step);
-                            //_logger.LogWarning($"Nenhum validador encontrado para o tipo de step: {stepType}");
+                            _logger.LogWarning($"Nenhum validador encontrado para o tipo de step: {stepType}");
                         }
                     }
                     else
                     {
-                        // Tipo de step desconhecido
                         stepDiag = new StepDiagnostic
                         {
                             StepId = step.OriginalStepId,
@@ -69,15 +60,13 @@ namespace CampaignWatchWorker.Application.Analyzer
                     diagnostic.StepDiagnostics.Add(stepDiag);
                 }
 
-                // Determinar saúde geral da execução
                 diagnostic.OverallHealth = DetermineOverallHealth(diagnostic.StepDiagnostics);
 
-                // Gerar resumo
                 diagnostic.Summary = GenerateExecutionSummary(diagnostic, execution);
             }
             catch (Exception ex)
             {
-                //_logger.LogError(ex, $"Erro ao analisar execução {execution.OriginalExecutionId}");
+                _logger.LogError(ex, $"Erro ao analisar execução {execution.OriginalExecutionId}");
                 diagnostic.OverallHealth = HealthStatusEnum.Error;
                 diagnostic.Summary = $"Erro durante análise: {ex.Message}";
             }
@@ -100,7 +89,6 @@ namespace CampaignWatchWorker.Application.Analyzer
             {
                 if (executions == null || !executions.Any())
                 {
-                    // Campanha sem execuções
                     if (campaign.CampaignType == CampaignTypeEnum.Pontual)
                     {
                         if (campaign.StatusCampaign == CampaignStatusEnum.Scheduled)
@@ -125,7 +113,6 @@ namespace CampaignWatchWorker.Application.Analyzer
                     return healthStatus;
                 }
 
-                // Verificar execuções pendentes ou em andamento
                 var pendingExecutions = executions.Where(e =>
                     e.Status != "Completed" &&
                     e.Status != "Error" &&
@@ -136,7 +123,6 @@ namespace CampaignWatchWorker.Application.Analyzer
                     healthStatus.HasPendingExecution = true;
                 }
 
-                // Verificar se há erros de integração
                 var executionsWithErrors = executions.Where(e => e.HasMonitoringErrors).ToList();
                 if (executionsWithErrors.Any())
                 {
@@ -144,7 +130,6 @@ namespace CampaignWatchWorker.Application.Analyzer
                     healthStatus.LastExecutionWithIssueId = executionsWithErrors.Last().OriginalExecutionId;
                 }
 
-                // Determinar mensagem baseada no tipo de campanha
                 if (campaign.CampaignType == CampaignTypeEnum.Pontual)
                 {
                     healthStatus.LastMessage = AnalyzePonctualCampaign(campaign, executions, healthStatus);
@@ -156,7 +141,7 @@ namespace CampaignWatchWorker.Application.Analyzer
             }
             catch (Exception ex)
             {
-                //_logger.LogError(ex, $"Erro ao analisar saúde da campanha {campaign.IdCampaign}");
+                _logger.LogError(ex, $"Erro ao analisar saúde da campanha {campaign.IdCampaign}");
                 healthStatus.HasIntegrationErrors = true;
                 healthStatus.LastMessage = $"Erro na análise de saúde: {ex.Message}";
             }
@@ -198,15 +183,12 @@ namespace CampaignWatchWorker.Application.Analyzer
             if (!stepDiagnostics.Any())
                 return HealthStatusEnum.Healthy;
 
-            // Se algum step é crítico, a execução é crítica
             if (stepDiagnostics.Any(s => s.Severity == HealthStatusEnum.Critical))
                 return HealthStatusEnum.Critical;
 
-            // Se algum step tem erro, a execução tem erro
             if (stepDiagnostics.Any(s => s.Severity == HealthStatusEnum.Error))
                 return HealthStatusEnum.Error;
 
-            // Se algum step tem warning, a execução tem warning
             if (stepDiagnostics.Any(s => s.Severity == HealthStatusEnum.Warning))
                 return HealthStatusEnum.Warning;
 
@@ -246,7 +228,6 @@ namespace CampaignWatchWorker.Application.Analyzer
                 return "Campanha pontual sem execuções";
             }
 
-            // Campanha pontual deve ter apenas uma execução
             if (executions.Count > 1)
             {
                 return $"AVISO: Campanha pontual com {executions.Count} execuções (esperado: 1)";
@@ -312,7 +293,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             if (campaign.Scheduler != null)
             {
-                // Verificar se está dentro do período de recorrência
                 if (DateTime.UtcNow < campaign.Scheduler.StartDateTime)
                 {
                     return $"Campanha recorrente aguardando início em {campaign.Scheduler.StartDateTime:dd/MM/yyyy HH:mm}";

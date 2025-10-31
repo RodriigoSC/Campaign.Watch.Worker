@@ -2,12 +2,10 @@
 using CampaignWatchWorker.Application.Mappers;
 using CampaignWatchWorker.Domain.Models;
 using CampaignWatchWorker.Domain.Models.Enums;
-using CampaignWatchWorker.Domain.Models.Interfaces; // Novo
+using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
-using CampaignWatchWorker.Domain.Models.Read.Campaign; // Novo
-using MongoDB.Bson;
-//using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace CampaignWatchWorker.Application.Processor
 {
@@ -18,9 +16,9 @@ namespace CampaignWatchWorker.Application.Processor
         private readonly IExecutionModelRepository _executionModelRepository;
         private readonly ICampaignMapper _campaignMapper;
         private readonly ICampaignHealthAnalyzer _healthAnalyzer;
-        private readonly ITenantContext _tenantContext; // Novo
-        private readonly IChannelReadModelService _channelReadModelService; // Novo
-        //private readonly ILogger<ProcessorApplication> _logger;
+        private readonly ITenantContext _tenantContext; 
+        private readonly IChannelReadModelService _channelReadModelService; 
+        private readonly ILogger<ProcessorApplication> _logger;
 
         public ProcessorApplication(
             ICampaignReadModelService campaignReadModelService,
@@ -28,38 +26,37 @@ namespace CampaignWatchWorker.Application.Processor
             IExecutionModelRepository executionModelRepository,
             ICampaignMapper campaignMapper,
             ICampaignHealthAnalyzer healthAnalyzer,
-            ITenantContext tenantContext, // Novo
-            IChannelReadModelService channelReadModelService // Novo
-            /*, ILogger<ProcessorApplication> logger*/)
+            ITenantContext tenantContext,
+            IChannelReadModelService channelReadModelService, 
+            ILogger<ProcessorApplication> logger)
         {
             _campaignReadModelService = campaignReadModelService;
             _campaignModelRepository = campaignModelRepository;
             _executionModelRepository = executionModelRepository;
             _campaignMapper = campaignMapper;
             _healthAnalyzer = healthAnalyzer;
-            _tenantContext = tenantContext; // Novo
-            _channelReadModelService = channelReadModelService; // Novo
-            //_logger = logger;
+            _tenantContext = tenantContext;
+            _channelReadModelService = channelReadModelService;
+            _logger = logger;
         }
 
-        // Método antigo 'Process(object obj)' é removido.
-
-        // --- NOVO MÉTODO PRINCIPAL ---
         public async Task ProcessDueCampaignsForClientAsync()
         {
             var clientName = _tenantContext.Client.Name;
-            //_logger.LogInformation("[{ClientName}] Buscando campanhas para processar.", clientName);
+            _logger.LogInformation("[{ClientName}] Buscando campanhas para processar.", clientName);
+            Console.WriteLine($"[{clientName}] Buscando campanhas para processar.");
 
-            // 1. Busca campanhas devidas no BD *do worker*
             var dueCampaigns = await _campaignModelRepository.ObterCampanhasDevidasParaClienteAsync(clientName);
 
             if (!dueCampaigns.Any())
             {
-                //_logger.LogInformation("[{ClientName}] Nenhuma campanha devida encontrada.", clientName);
+                _logger.LogInformation("[{ClientName}] Nenhuma campanha devida encontrada.", clientName);
+                Console.WriteLine($"[{clientName}] Nenhuma campanha devida encontrada.");
                 return;
             }
 
-            //_logger.LogInformation("[{ClientName}] Encontradas {Count} campanhas.", clientName, dueCampaigns.Count());
+            _logger.LogInformation("[{ClientName}] Encontradas {Count} campanhas.", clientName, dueCampaigns.Count());
+            Console.WriteLine($"[{clientName}] Encontradas {dueCampaigns.Count()} campanhas.");
 
             foreach (var campaignModel in dueCampaigns)
             {
@@ -74,30 +71,27 @@ namespace CampaignWatchWorker.Application.Processor
 
             try
             {
-                //_logger.LogInformation("[{ClientName}] Processando Campanha ID: {CampaignId}", clientName, campaignSourceId);
+                _logger.LogInformation("[{ClientName}] Processando Campanha ID: {CampaignId}", clientName, campaignSourceId);
+                Console.WriteLine($"[{clientName}] Processando Campanha ID: {campaignSourceId}");
 
-                // --- PASSO 1: Buscar dados da campanha na ORIGEM (DB do cliente) ---
                 var campaignReadModel = await _campaignReadModelService.GetCampaignById(campaignSourceId);
                 if (campaignReadModel == null)
                 {
-                    //_logger.LogWarning("[{ClientName}] Campanha {CampaignId} não encontrada na origem. Marcando como inativa.", clientName, campaignSourceId);
+                    _logger.LogWarning("[{ClientName}] Campanha {CampaignId} não encontrada na origem. Marcando como inativa.", clientName, campaignSourceId);
+                    Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} não encontrada na origem. Marcando como inativa.");
                     campaignModel.IsActive = false;
                     campaignModel.MonitoringNotes = "Campanha não encontrada na origem.";
                     await _campaignModelRepository.AtualizarCampanhaAsync(campaignModel);
                     return;
                 }
 
-                // --- PASSO 2: Mapear dados base da campanha ---
-                // (O Mapper não pode mais preencher tudo, o modelo existente é usado)
                 var updatedCampaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
 
-                // Preserva dados do monitoramento
                 updatedCampaignModel.Id = campaignModel.Id;
                 updatedCampaignModel.CreatedAt = campaignModel.CreatedAt;
                 updatedCampaignModel.FirstMonitoringAt = campaignModel.FirstMonitoringAt;
 
 
-                // --- PASSO 3: Buscar e processar execuções da ORIGEM ---
                 var executionsRead = await _campaignReadModelService.GetExecutionsByCampaign(campaignSourceId);
                 var executionModels = new List<ExecutionModel>();
                 int errorExecutionCount = 0;
@@ -108,48 +102,45 @@ namespace CampaignWatchWorker.Application.Processor
                     {
                         try
                         {
-                            // --- PASSO 4 (NOVO): Buscar dados consolidados do canal ---
                             var channelData = await _channelReadModelService.GetConsolidatedChannelDataAsync(executionRead.ExecutionId.ToString());
 
-                            // --- PASSO 5: Mapear execução com os dados do canal ---
                             var executionModel = _campaignMapper.MapToExecutionModel(executionRead, campaignModel.Id, channelData);
                             if (executionModel == null) continue;
 
-                            // Analisar saúde da execução
                             var diagnostic = await _healthAnalyzer.AnalyzeExecutionAsync(executionModel, updatedCampaignModel);
                             executionModel.HasMonitoringErrors = diagnostic.OverallHealth == HealthStatusEnum.Error ||
                                                                  diagnostic.OverallHealth == HealthStatusEnum.Critical;
 
                             if (executionModel.HasMonitoringErrors) errorExecutionCount++;
 
-                            // Persistir/Atualizar execução no BD de Monitoramento
                             await _executionModelRepository.AtualizarExecucaoAsync(executionModel);
                             executionModels.Add(executionModel);
                         }
                         catch (Exception ex)
                         {
-                            //_logger.LogError(ex, "[{ClientName}] Falha ao processar execução {ExecId} da campanha {CampaignId}", clientName, executionRead?.ExecutionId, campaignSourceId);
+                            _logger.LogError(ex, "[{ClientName}] Falha ao processar execução {ExecId} da campanha {CampaignId}", clientName, executionRead?.ExecutionId, campaignSourceId);
+                            Console.WriteLine($"[{clientName}] Falha ao processar execução {executionRead?.ExecutionId} da campanha {campaignSourceId}: {ex}");
                         }
                     }
                 }
 
-                // --- PASSO 6: Analisar saúde GERAL da campanha ---
                 var campaignHealth = await _healthAnalyzer.AnalyzeCampaignHealthAsync(updatedCampaignModel, executionModels);
                 updatedCampaignModel.HealthStatus = campaignHealth;
                 updatedCampaignModel.LastCheckMonitoring = DateTime.UtcNow;
                 updatedCampaignModel.ExecutionsWithErrors = errorExecutionCount;
                 updatedCampaignModel.TotalExecutionsProcessed = executionModels.Count;
-                updatedCampaignModel.NextExecutionMonitoring = CalculateNextCheck(updatedCampaignModel); // (Lógica de agendamento)
+                updatedCampaignModel.NextExecutionMonitoring = CalculateNextCheck(updatedCampaignModel);
 
-                // --- PASSO 7: Atualizar a campanha no BD de Monitoramento ---
                 await _campaignModelRepository.AtualizarCampanhaAsync(updatedCampaignModel);
 
-                //_logger.LogInformation("[{ClientName}] Campanha {CampaignId} processada. Próxima checagem: {NextCheck}", clientName, campaignSourceId, updatedCampaignModel.NextExecutionMonitoring);
+                _logger.LogInformation("[{ClientName}] Campanha {CampaignId} processada. Próxima checagem: {NextCheck}", clientName, campaignSourceId, updatedCampaignModel.NextExecutionMonitoring);
+                Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} processada. Próxima checagem: {updatedCampaignModel.NextExecutionMonitoring}");
             }
             catch (Exception ex)
             {
-                //_logger.LogError(ex, "[{ClientName}] ERRO FATAL ao processar Campanha {CampaignId}", clientName, campaignSourceId);
-                // Tenta reagendar com erro
+                _logger.LogError(ex, "[{ClientName}] ERRO FATAL ao processar Campanha {CampaignId}", clientName, campaignSourceId);
+                Console.WriteLine($"[{clientName}] ERRO FATAL ao processar Campanha {campaignSourceId}: {ex}");
+
                 try
                 {
                     campaignModel.HealthStatus ??= new MonitoringHealthStatus();
@@ -160,28 +151,27 @@ namespace CampaignWatchWorker.Application.Processor
                     campaignModel.NextExecutionMonitoring = DateTime.UtcNow.AddMinutes(15);
                     await _campaignModelRepository.AtualizarCampanhaAsync(campaignModel);
                 }
-                catch { /* Ignore */ }
+                catch 
+                {
+                    
+                }
             }
         }
 
-        // (Copie o método CalculateNextCheck do ProcessorApplication.cs original)
         private DateTime? CalculateNextCheck(CampaignModel campaign)
         {
             var now = DateTime.UtcNow;
 
-            // Se a campanha está inativa ou deletada, não precisa checar
             if (!campaign.IsActive || campaign.IsDeleted)
             {
                 return null;
             }
 
-            // Se há problemas críticos/erros de integração, verificar mais cedo
             if (campaign.HealthStatus?.HasIntegrationErrors == true)
             {
                 return now.AddMinutes(5);
             }
 
-            // Campanha pontual
             if (campaign.CampaignType == CampaignTypeEnum.Pontual)
             {
                 if (campaign.StatusCampaign == CampaignStatusEnum.Completed && campaign.HealthStatus?.HasIntegrationErrors == false)
@@ -199,7 +189,6 @@ namespace CampaignWatchWorker.Application.Processor
                 return now.AddMinutes(30);
             }
 
-            // Campanha recorrente
             if (campaign.CampaignType == CampaignTypeEnum.Recorrente)
             {
                 if (campaign.HealthStatus?.HasPendingExecution == true)
@@ -221,6 +210,44 @@ namespace CampaignWatchWorker.Application.Processor
             }
 
             return now.AddMinutes(30);
+        }
+
+        public async Task DiscoverNewCampaignsAsync()
+        {
+            var clientName = _tenantContext.Client.Name;
+            _logger.LogInformation("[{ClientName}] Iniciando descoberta de campanhas ativas na origem.", clientName);
+            Console.WriteLine($"[{clientName}] Iniciando descoberta de campanhas ativas na origem.");
+
+            var discoverableCampaigns = await _campaignReadModelService.GetDiscoverableCampaignsAsync();
+
+            if (!discoverableCampaigns.Any())
+            {
+                _logger.LogInformation("[{ClientName}] Nenhuma campanha ativa encontrada na origem.", clientName);
+                Console.WriteLine($"[{clientName}] Nenhuma campanha ativa encontrada na origem.");
+                return;
+            }
+
+            _logger.LogInformation("[{ClientName}] Encontradas {Count} campanhas ativas na origem. Sincronizando...", clientName, discoverableCampaigns.Count());
+            Console.WriteLine($"[{clientName}] Encontradas {discoverableCampaigns.Count()} campanhas ativas na origem. Sincronizando...");
+
+            foreach (var campaignReadModel in discoverableCampaigns)
+            {
+                try
+                {
+                    var campaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
+
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.Pending;
+                    campaignModel.NextExecutionMonitoring = DateTime.UtcNow;
+                    campaignModel.FirstMonitoringAt = DateTime.UtcNow;
+
+                    await _campaignModelRepository.AtualizarCampanhaAsync(campaignModel);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[{ClientName}] Falha ao sincronizar campanha {CampaignId} da origem.", clientName, campaignReadModel.Id);
+                    Console.WriteLine($"[{clientName}] Falha ao sincronizar campanha {campaignReadModel.Id} da origem: {ex}");
+                }
+            }
         }
     }
 }

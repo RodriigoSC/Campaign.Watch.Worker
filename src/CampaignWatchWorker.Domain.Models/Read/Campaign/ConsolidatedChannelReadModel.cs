@@ -21,17 +21,14 @@ namespace CampaignWatchWorker.Domain.Models.Read.Campaign
     [BsonIgnoreExtraElements]
     public class ChannelTotalStatus
     {
-        // Campos comuns
         public int? TotalDeduplication { get; set; }
         public int? TotalBlocked { get; set; }
         public int? TotalUnknown { get; set; }
 
-        // Email / SMS / Push
         public int? TotalSuccess { get; set; }
         public int? TotalOptout { get; set; }
         public int? TotalError { get; set; }
 
-        // WhatsApp
         public int? TotalFail { get; set; }
     }
 }

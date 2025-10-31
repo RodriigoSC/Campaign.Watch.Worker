@@ -32,15 +32,15 @@ namespace CampaignWatchWorker.Domain.Models
 
     public class WorkflowStep
     {
-        public string OriginalStepId { get; set; } // ID do Step no sistema de origem
+        public string OriginalStepId { get; set; } 
         public string Name { get; set; }
-        public string Type { get; set; } // Ex: Filter, Channel, End
+        public string Type { get; set; } 
         public string Status { get; set; }
         //public DateTime StartDate { get; set; }
         public long TotalUser { get; set; }
         public long TotalExecutionTime { get; set; }
-        public string Error { get; set; } 
-        public string ChannelName { get; set; } 
+        public string Error { get; set; }
+        public string ChannelName { get; set; }
         public string MonitoringNotes { get; set; }
         public ChannelIntegrationData IntegrationData { get; set; }
     }

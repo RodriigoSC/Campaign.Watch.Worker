@@ -1,5 +1,4 @@
 ﻿using CampaignWatchWorker.Data.Factories.Common;
-using DTM_Vault.Data.KeyValue;
 using MongoDB.Driver;
 
 namespace CampaignWatchWorker.Data.Factories

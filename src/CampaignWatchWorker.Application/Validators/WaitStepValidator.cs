@@ -83,31 +83,6 @@ namespace CampaignWatchWorker.Application.Validators
             diagnostic.Severity = HealthStatusEnum.Healthy;
             diagnostic.Message = "Step de espera aguardando execução";
             return diagnostic;
-        }
-
-        // Método auxiliar para extrair o horário programado do step
-        // Este método deve ser adaptado conforme a estrutura real dos dados
-        private DateTime? ExtractScheduledTime(WorkflowStep step)
-        {
-            // Exemplo de como extrair se houver um campo específico
-            // Este é apenas um exemplo e deve ser ajustado conforme necessário
-
-            try
-            {
-                // Se houver dados de execução com timestamp
-                if (step.TotalExecutionTime > 0)
-                {
-                    // Calcular baseado no tempo de início da execução + tempo esperado
-                    // Esta lógica precisa ser ajustada conforme a estrutura real
-                }
-
-                // Retornar null se não for possível determinar
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        }        
     }
 }

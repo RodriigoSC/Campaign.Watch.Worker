@@ -11,7 +11,7 @@ namespace CampaignWatchWorker.Application.Validators
         private static readonly TimeSpan CriticalTimeout = TimeSpan.FromHours(2);
         private static readonly TimeSpan WarningTimeout = TimeSpan.FromHours(1);
 
-        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step,ExecutionModel execution,CampaignModel campaign)
+        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
         {
             var diagnostic = new StepDiagnostic
             {

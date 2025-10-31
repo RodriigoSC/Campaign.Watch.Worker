@@ -41,7 +41,6 @@ namespace CampaignWatchWorker.Data.Repositories
                 Builders<CampaignModel>.Filter.Eq(c => c.IdCampaign, campaignModel.IdCampaign)
             );
 
-            // Define quais campos serão atualizados
             var updateDefinition = Builders<CampaignModel>.Update
                 .Set(x => x.NumberId, campaignModel.NumberId)
                 .Set(x => x.Name, campaignModel.Name)
@@ -49,7 +48,7 @@ namespace CampaignWatchWorker.Data.Repositories
                 .Set(x => x.Description, campaignModel.Description)
                 .Set(x => x.ProjectId, campaignModel.ProjectId)
                 .Set(x => x.IsActive, campaignModel.IsActive)
-                .Set(x => x.ModifiedAt, DateTime.UtcNow) // Sempre atualiza ModifiedAt na atualização
+                .Set(x => x.ModifiedAt, DateTime.UtcNow)
                 .Set(x => x.StatusCampaign, campaignModel.StatusCampaign)
                 .Set(x => x.MonitoringStatus, campaignModel.MonitoringStatus)
                 .Set(x => x.NextExecutionMonitoring, campaignModel.NextExecutionMonitoring)
@@ -61,26 +60,21 @@ namespace CampaignWatchWorker.Data.Repositories
                 .Set(x => x.TotalExecutionsProcessed, campaignModel.TotalExecutionsProcessed)
                 .Set(x => x.ExecutionsWithErrors, campaignModel.ExecutionsWithErrors)
                 .Set(x => x.MonitoringNotes, campaignModel.MonitoringNotes)
-
-                // Campos definidos apenas na inserção (Upsert)
-                .SetOnInsert(x => x.Id, campaignModel.Id == ObjectId.Empty ? ObjectId.GenerateNewId() : campaignModel.Id) // Garante um ID na inserção
-                .SetOnInsert(x => x.ClientName, campaignModel.ClientName) // Necessário para o filtro funcionar no upsert
-                .SetOnInsert(x => x.IdCampaign, campaignModel.IdCampaign) // Necessário para o filtro funcionar no upsert
-                .SetOnInsert(x => x.CreatedAt, campaignModel.CreatedAt == DateTime.MinValue ? DateTime.UtcNow : campaignModel.CreatedAt) // Define CreatedAt na inserção
-                .SetOnInsert(x => x.FirstMonitoringAt, campaignModel.FirstMonitoringAt ?? DateTime.UtcNow); // Define FirstMonitoringAt na inserção
+                .SetOnInsert(x => x.Id, campaignModel.Id == ObjectId.Empty ? ObjectId.GenerateNewId() : campaignModel.Id)
+                .SetOnInsert(x => x.ClientName, campaignModel.ClientName)
+                .SetOnInsert(x => x.IdCampaign, campaignModel.IdCampaign)
+                .SetOnInsert(x => x.CreatedAt, campaignModel.CreatedAt == DateTime.MinValue ? DateTime.UtcNow : campaignModel.CreatedAt) 
+                .SetOnInsert(x => x.FirstMonitoringAt, campaignModel.FirstMonitoringAt ?? DateTime.UtcNow);
 
 
             var options = new UpdateOptions { IsUpsert = true };
 
             var result = await _collection.UpdateOneAsync(filter, updateDefinition, options);
 
-            // Se foi um upsert (inserção), o ID pode ter sido gerado pelo MongoDB.
-            // Atualizamos o ID no objeto campaignModel para refletir o ID real no banco.
             if (result.UpsertedId != null)
             {
                 campaignModel.Id = result.UpsertedId.AsObjectId;
             }
-            // Se foi apenas um update e o ID já existia, ele permanece o mesmo.
 
             return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
         }
