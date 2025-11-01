@@ -21,9 +21,11 @@ namespace CampaignWatchWorker.Application.Resolver
 
             // Step Validators
             services.AddTransient<IStepValidator, FilterStepValidator>();
+            services.AddTransient<IStepValidator, DecisionSplitStepValidator>();
             services.AddTransient<IStepValidator, ChannelStepValidator>();
             services.AddTransient<IStepValidator, WaitStepValidator>();
             services.AddTransient<IStepValidator, EndStepValidator>();
+            services.AddTransient<IStepValidator, DatedStepValidator>();
 
             return services;
         }

@@ -21,7 +21,6 @@ namespace CampaignWatchWorker.Application.Validators
                 DetectedAt = DateTime.UtcNow
             };
 
-            // 1. Verificar erro explícito no step (ex: falha ao iniciar)
             if (!string.IsNullOrEmpty(step.Error))
             {
                 diagnostic.DiagnosticType = DiagnosticTypeEnum.StepFailed;
@@ -31,10 +30,8 @@ namespace CampaignWatchWorker.Application.Validators
                 return diagnostic;
             }
 
-            // 2. Verificar se os dados de integração existem
             if (step.IntegrationData == null)
             {
-                // Isso foi definido no CampaignMapper
                 if (step.MonitoringNotes?.Contains("ERRO") == true)
                 {
                     diagnostic.DiagnosticType = DiagnosticTypeEnum.IntegrationError;
@@ -58,7 +55,7 @@ namespace CampaignWatchWorker.Application.Validators
             {
                 diagnostic.DiagnosticType = DiagnosticTypeEnum.IntegrationError;
                 diagnostic.Severity = HealthStatusEnum.Error;
-                diagnostic.Message = "O sistema de canal (ex: Effmail, Effsms) reportou um status de 'Erro' para esta trigger.";
+                diagnostic.Message = "O sistema de canal reportou um status de 'Erro' para esta trigger.";
                 return diagnostic;
             }
 
@@ -90,23 +87,9 @@ namespace CampaignWatchWorker.Application.Validators
                     diagnostic.AdditionalData["LeadsError"] = leads.Error;
                     diagnostic.AdditionalData["TotalProcessed"] = totalProcessed;
                 }
-            }
+            }           
 
-            // 5. Verificar processamento de arquivo
-            if (integration.File != null && integration.File.StartedAt.HasValue && !integration.File.FinishedAt.HasValue)
-            {
-                var fileProcessingTime = DateTime.UtcNow - integration.File.StartedAt.Value;
-                if (fileProcessingTime > FileProcessingTimeout)
-                {
-                    diagnostic.DiagnosticType = DiagnosticTypeEnum.IntegrationError;
-                    diagnostic.Severity = HealthStatusEnum.Warning;
-                    diagnostic.Message = $"ALERTA: O processamento do arquivo '{integration.File.Name}' está demorando mais de {FileProcessingTimeout.TotalHours} hora(s).";
-                    diagnostic.AdditionalData["FileProcessingTimeHours"] = fileProcessingTime.TotalHours;
-                }
-            }
-
-            // 6. Se nenhum problema foi encontrado
-            if (diagnostic.Severity == default(HealthStatusEnum)) // Se ainda não foi classificado
+            if (diagnostic.Severity == default(HealthStatusEnum))
             {
                 diagnostic.Severity = HealthStatusEnum.Healthy;
                 diagnostic.Message = $"Etapa de canal operando. Status: {step.Status}";

@@ -37,9 +37,19 @@ namespace CampaignWatchWorker.Domain.Models
 
         public Scheduler Scheduler { get; set; }
 
+        [BsonIgnore]
+        public Dictionary<string, WorkflowStepConfig> WorkflowConfiguration { get; set; } = new();
         public int TotalExecutionsProcessed { get; set; }
         public int ExecutionsWithErrors { get; set; }
         public DateTime? FirstMonitoringAt { get; set; }
         public string MonitoringNotes { get; set; }
+    }
+
+    public class WorkflowStepConfig
+    {
+        public string StepId { get; set; }
+        public WorkflowStepTypeEnum StepType { get; set; }
+        public DateTime? ScheduledExecutionDate { get; set; }
+
     }
 }

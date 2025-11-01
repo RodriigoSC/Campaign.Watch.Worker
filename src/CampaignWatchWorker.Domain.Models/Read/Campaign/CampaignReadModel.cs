@@ -98,5 +98,8 @@ namespace CampaignWatchWorker.Domain.Models.Read.Campaign
 
         [BsonElement("ComponentType")]
         public int ComponentType { get; set; }
+
+        [BsonElement("Component")]
+        public BsonDocument Component { get; set; }
     }
 }

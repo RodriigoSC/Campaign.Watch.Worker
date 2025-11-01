@@ -8,8 +8,8 @@ namespace CampaignWatchWorker.Application.Validators
     {
         public WorkflowStepTypeEnum SupportedStepType => WorkflowStepTypeEnum.Filter;
 
-        private static readonly TimeSpan CriticalTimeout = TimeSpan.FromHours(2);
-        private static readonly TimeSpan WarningTimeout = TimeSpan.FromHours(1);
+        private static readonly TimeSpan CriticalTimeout = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan WarningTimeout = TimeSpan.FromMinutes(10);
 
         public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
         {
@@ -20,7 +20,6 @@ namespace CampaignWatchWorker.Application.Validators
                 DetectedAt = DateTime.UtcNow
             };
 
-            // 1. Verificar se há um erro explícito no step
             if (!string.IsNullOrEmpty(step.Error))
             {
                 diagnostic.DiagnosticType = DiagnosticTypeEnum.StepFailed;
@@ -30,33 +29,29 @@ namespace CampaignWatchWorker.Application.Validators
                 return diagnostic;
             }
 
-            // 2. Se o step foi concluído, está saudável
             if (step.Status == "Completed")
             {
                 diagnostic.Severity = HealthStatusEnum.Healthy;
                 diagnostic.Message = "Etapa de filtro concluída com sucesso.";
                 return diagnostic;
             }
-
-            // 3. Se não foi concluído, verificar timeout
-            // Nota: O modelo WorkflowStep não possui StartDate.
-            // Usamos o StartDate da Execução como a melhor aproximação.
-            if (execution.StartDate.HasValue)
+            
+            if (step.StartDate.HasValue)
             {
-                var runningTime = DateTime.UtcNow - execution.StartDate.Value;
+                var runningTime = DateTime.UtcNow - step.StartDate.Value;
 
                 if (runningTime > CriticalTimeout)
                 {
                     diagnostic.DiagnosticType = DiagnosticTypeEnum.FilterStuck;
                     diagnostic.Severity = HealthStatusEnum.Critical;
-                    diagnostic.Message = $"CRÍTICO: Etapa de filtro em execução há mais de {CriticalTimeout.TotalHours} horas. Pode estar travada.";
+                    diagnostic.Message = $"CRÍTICO: Etapa de filtro em execução há mais de {CriticalTimeout.TotalHours} minutos. Pode estar travada.";
                     diagnostic.AdditionalData["RunningTimeHours"] = runningTime.TotalHours;
                 }
                 else if (runningTime > WarningTimeout)
                 {
                     diagnostic.DiagnosticType = DiagnosticTypeEnum.FilterStuck;
                     diagnostic.Severity = HealthStatusEnum.Warning;
-                    diagnostic.Message = $"ALERTA: Etapa de filtro em execução há mais de {WarningTimeout.TotalHours} hora(s).";
+                    diagnostic.Message = $"ALERTA: Etapa de filtro em execução há mais de {WarningTimeout.TotalHours} minutos.";
                     diagnostic.AdditionalData["RunningTimeHours"] = runningTime.TotalHours;
                 }
                 else

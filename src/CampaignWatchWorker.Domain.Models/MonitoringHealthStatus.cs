@@ -36,7 +36,7 @@ namespace CampaignWatchWorker.Domain.Models
         public string Name { get; set; }
         public string Type { get; set; } 
         public string Status { get; set; }
-        //public DateTime StartDate { get; set; }
+        public DateTime? StartDate { get; set; }
         public long TotalUser { get; set; }
         public long TotalExecutionTime { get; set; }
         public string Error { get; set; }
@@ -50,17 +50,7 @@ namespace CampaignWatchWorker.Domain.Models
         public string? Raw { get; set; }
         public string ChannelName { get; set; }
         public string IntegrationStatus { get; set; }
-        public string TemplateId { get; set; }
-        public FileInfoData File { get; set; }
         public LeadsData Leads { get; set; }
-    }
-
-    public class FileInfoData
-    {
-        public string Name { get; set; }
-        public DateTime? StartedAt { get; set; }
-        public DateTime? FinishedAt { get; set; }
-        public long Total { get; set; }
     }
 
     public class LeadsData

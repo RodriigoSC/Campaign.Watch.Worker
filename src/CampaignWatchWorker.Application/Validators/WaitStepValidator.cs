@@ -8,10 +8,7 @@ namespace CampaignWatchWorker.Application.Validators
     {
         public WorkflowStepTypeEnum SupportedStepType => WorkflowStepTypeEnum.Wait;
 
-        public async Task<StepDiagnostic> ValidateAsync(
-            WorkflowStep step,
-            ExecutionModel execution,
-            CampaignModel campaign)
+        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
         {
             var diagnostic = new StepDiagnostic
             {
@@ -20,7 +17,6 @@ namespace CampaignWatchWorker.Application.Validators
                 DetectedAt = DateTime.UtcNow
             };
 
-            // Verificar se há erro registrado
             if (!string.IsNullOrEmpty(step.Error))
             {
                 diagnostic.DiagnosticType = DiagnosticTypeEnum.StepFailed;

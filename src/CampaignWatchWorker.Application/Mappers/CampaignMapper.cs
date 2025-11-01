@@ -20,7 +20,7 @@ namespace CampaignWatchWorker.Application.Mappers
         {
             if (campaignReadModel == null) return null!;
 
-            return new CampaignModel
+            var campaignModel = new CampaignModel
             {
                 ClientName = _tenantContext.Client.Name,
                 IdCampaign = campaignReadModel.Id,
@@ -36,8 +36,38 @@ namespace CampaignWatchWorker.Application.Mappers
                 ModifiedAt = campaignReadModel.ModifiedAt,
                 ProjectId = campaignReadModel.ProjectId,
                 Scheduler = MapScheduler(campaignReadModel.Scheduler),
-                HealthStatus = new MonitoringHealthStatus()
+                HealthStatus = new MonitoringHealthStatus(),
+                WorkflowConfiguration = new Dictionary<string, WorkflowStepConfig>()
             };
+            
+            if (campaignReadModel.Journey?.Workflow != null)
+            {
+                foreach (var workflowStep in campaignReadModel.Journey.Workflow)
+                {
+                    if (string.IsNullOrEmpty(workflowStep.Id) ||
+                        campaignModel.WorkflowConfiguration.ContainsKey(workflowStep.Id))
+                    {
+                        continue;
+                    }
+
+                    var config = new WorkflowStepConfig
+                    {
+                        StepId = workflowStep.Id,
+                        StepType = (WorkflowStepTypeEnum)workflowStep.ComponentType
+                    };
+
+                    if (config.StepType == WorkflowStepTypeEnum.Dated &&
+                        workflowStep.Component != null &&
+                        workflowStep.Component.Contains("ExecutionDate"))
+                    {
+                        config.ScheduledExecutionDate = workflowStep.Component["ExecutionDate"].AsNullableDateTime;
+                    }
+
+                    campaignModel.WorkflowConfiguration.Add(config.StepId, config);
+                }
+            }
+
+            return campaignModel;
         }
 
         public ExecutionModel MapToExecutionModel(ExecutionReadModel executionRead, ObjectId campaignMonitoringId, Dictionary<string, ConsolidatedChannelReadModel> channelData)
@@ -70,6 +100,7 @@ namespace CampaignWatchWorker.Application.Mappers
             };
         }
 
+        
         private List<WorkflowStep> MapWorkflowSteps(IEnumerable<WorkflowExecutionReadModel> workflows, ObjectId executionId, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             var steps = new List<WorkflowStep>();
@@ -104,7 +135,7 @@ namespace CampaignWatchWorker.Application.Mappers
                 Error = workflow.Error?.ToString() ?? string.Empty,
             };
         }
-
+       
         private void EnrichWorkflowStep(WorkflowStep step, WorkflowExecutionReadModel workflow, WorkflowStepTypeEnum stepType, Dictionary<string, ConsolidatedChannelReadModel> channelData)
         {
             switch (stepType)
@@ -112,24 +143,21 @@ namespace CampaignWatchWorker.Application.Mappers
                 case WorkflowStepTypeEnum.Filter:
                     HandleFilterStep(step, workflow);
                     break;
+
                 case WorkflowStepTypeEnum.Channel:
                     HandleChannelStep(step, workflow, channelData);
                     break;
+                case WorkflowStepTypeEnum.Wait:
+                case WorkflowStepTypeEnum.DecisionSplit:
+                case WorkflowStepTypeEnum.RandomSplit:
+                    break;
                 case WorkflowStepTypeEnum.End:
-                    step.MonitoringNotes = "Etapa final da jornada.";
                     break;
             }
         }
-
+        
         private void HandleFilterStep(WorkflowStep step, WorkflowExecutionReadModel workflow)
-        {
-            const int FilterTimeoutHours = 1;
-
-            if (step.Status != "Completed" &&
-                (DateTime.UtcNow - workflow.StartDate) > TimeSpan.FromHours(FilterTimeoutHours))
-            {
-                step.MonitoringNotes = $"ALERTA: Etapa de filtro está em execução há mais de {FilterTimeoutHours} hora(s).";
-            }
+        {            
         }
 
         private void HandleChannelStep(WorkflowStep step, WorkflowExecutionReadModel workflow, Dictionary<string, ConsolidatedChannelReadModel> channelData)
@@ -147,10 +175,8 @@ namespace CampaignWatchWorker.Application.Mappers
                 {
                     ChannelName = consolidatedData.Channel,
                     IntegrationStatus = consolidatedData.StatusTrigger,
-                    TemplateId = null,
                     Raw = JsonConvert.SerializeObject(consolidatedData),
                     Leads = MapLeadsData(consolidatedData.TotalStatus),
-                    File = null
                 };
             }
             else

@@ -11,7 +11,6 @@ namespace CampaignWatchWorker.Domain.Models
         public string Name { get; set; }
         public bool IsActive { get; set; }
         public CampaignDbConfig CampaignConfig { get; set; }
-        public EffectiveChannels EffectiveChannels { get; set; }
     }
 
     [BsonIgnoreExtraElements]
@@ -19,29 +18,5 @@ namespace CampaignWatchWorker.Domain.Models
     {
         public string ProjectID { get; set; }
         public string Database { get; set; }
-    }
-
-    [BsonIgnoreExtraElements]
-    public class EffectiveChannels
-    {
-        [BsonElement("EFFMAIL")]
-        public List<ChannelDbConfig> Effmail { get; set; } = new();
-
-        [BsonElement("EFFSMS")]
-        public List<ChannelDbConfig> Effsms { get; set; } = new();
-
-        [BsonElement("EFFPUSH")]
-        public List<ChannelDbConfig> Effpush { get; set; } = new();
-
-        [BsonElement("EFFWHATSAPP")]
-        public List<ChannelDbConfig> Effwhatsapp { get; set; } = new();
-    }
-
-    [BsonIgnoreExtraElements]
-    public class ChannelDbConfig
-    {
-        public string Name { get; set; }
-        public string Integration { get; set; }
-        public string DataBase { get; set; }
-    }
+    }    
 }
