@@ -60,6 +60,8 @@ namespace CampaignWatchWorker.Infra.Campaign.Services
                 {
                     (int)CampaignStatusEnum.Executing,
                     (int)CampaignStatusEnum.Scheduled,
+
+                    // Remover
                     (int)CampaignStatusEnum.Draft,
                     (int)CampaignStatusEnum.Canceled,
                     (int)CampaignStatusEnum.Canceling,

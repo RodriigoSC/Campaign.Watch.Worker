@@ -28,13 +28,12 @@ namespace CampaignWatchWorker.Data.Repositories
             CreateIndexesAsync(new List<CreateIndexModel<CampaignModel>> { uniqueIndexModel, workerIndexModel }).GetAwaiter().GetResult();
         }
 
-        public async Task<CampaignModel> CriarCampanhaAsync(CampaignModel campaignModel)
+        public async Task<CampaignModel> CreateCampaignAsync(CampaignModel campaignModel)
         {
             await _collection.InsertOneAsync(campaignModel);
             return campaignModel;
         }
-
-        public async Task<bool> AtualizarCampanhaAsync(CampaignModel campaignModel)
+        public async Task<bool> UpdateCampaignAsync(CampaignModel campaignModel)
         {
             var filter = Builders<CampaignModel>.Filter.And(
                 Builders<CampaignModel>.Filter.Eq(c => c.ClientName, campaignModel.ClientName),
@@ -78,8 +77,7 @@ namespace CampaignWatchWorker.Data.Repositories
 
             return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
         }
-
-        public async Task<CampaignModel?> ObterCampanhaPorIdAsync(string clientName, string idCampaign)
+        public async Task<CampaignModel?> GetCampaignByIdAsync(string clientName, string idCampaign)
         {
             var filter = Builders<CampaignModel>.Filter.And(
                 Builders<CampaignModel>.Filter.Eq(c => c.ClientName, clientName),
@@ -87,8 +85,7 @@ namespace CampaignWatchWorker.Data.Repositories
             );
             return await _collection.FindAsync(filter).Result.FirstOrDefaultAsync();
         }
-
-        public async Task<IEnumerable<CampaignModel>> ObterCampanhasDevidasParaClienteAsync(string clientName)
+        public async Task<IEnumerable<CampaignModel>> GetDueCampaignsForClientAsync(string clientName)
         {
             var now = DateTime.UtcNow;
             var filter = Builders<CampaignModel>.Filter.And(

@@ -73,7 +73,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return diagnostic;
         }
-
         public async Task<MonitoringHealthStatus> AnalyzeCampaignHealthAsync(CampaignModel campaign, List<ExecutionModel> executions)
         {
             var healthStatus = new MonitoringHealthStatus
@@ -148,7 +147,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return healthStatus;
         }
-
         private StepDiagnostic CreateGenericStepDiagnostic(WorkflowStep step)
         {
             var diagnostic = new StepDiagnostic
@@ -177,7 +175,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return diagnostic;
         }
-
         private HealthStatusEnum DetermineOverallHealth(List<StepDiagnostic> stepDiagnostics)
         {
             if (!stepDiagnostics.Any())
@@ -194,7 +191,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return HealthStatusEnum.Healthy;
         }
-
         private string GenerateExecutionSummary(ExecutionDiagnostic diagnostic, ExecutionModel execution)
         {
             var criticalIssues = diagnostic.StepDiagnostics.Count(s => s.Severity == HealthStatusEnum.Critical);
@@ -218,7 +214,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return $"Execução saudável. Status: {execution.Status}";
         }
-
         private string AnalyzePonctualCampaign(CampaignModel campaign, List<ExecutionModel> executions, MonitoringHealthStatus healthStatus)
         {
             var lastExecution = executions.OrderByDescending(e => e.StartDate).FirstOrDefault();
@@ -267,7 +262,6 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return $"Campanha pontual - Status: {campaign.StatusCampaign}";
         }
-
         private string AnalyzeRecurrentCampaign(CampaignModel campaign, List<ExecutionModel> executions, MonitoringHealthStatus healthStatus)
         {
             var completedExecutions = executions.Count(e => e.Status == "Completed");

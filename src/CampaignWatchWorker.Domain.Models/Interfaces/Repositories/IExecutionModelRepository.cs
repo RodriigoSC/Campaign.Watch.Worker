@@ -2,7 +2,7 @@
 {
     public interface IExecutionModelRepository
     {
-        Task<ExecutionModel> CriarExecucaoAsync(ExecutionModel executionModel);
-        Task<bool> AtualizarExecucaoAsync(ExecutionModel executionModel);
+        Task<ExecutionModel> CreateExecutionAsync(ExecutionModel executionModel);
+        Task<bool> UpdateExecutionAsync(ExecutionModel executionModel);
     }
 }

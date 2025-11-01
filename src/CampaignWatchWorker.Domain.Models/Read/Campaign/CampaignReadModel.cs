@@ -59,14 +59,23 @@ namespace CampaignWatchWorker.Domain.Models.Read.Campaign
     [BsonIgnoreExtraElements]
     public class SchedulerReadModel
     {
+        [BsonElement("SchedulerAPIId")]
         public string SchedulerAPIId { get; set; }
+
+        [BsonElement("Crontab")]
         public string Crontab { get; set; }
+
+        [BsonElement("StartDateTime")]
         public DateTime StartDateTime { get; set; }
+
+        [BsonElement("EndDateTime")]
         public DateTime? EndDateTime { get; set; }
 
+        [BsonElement("IsRecurrent")]
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsRecurrent { get; set; }
 
+        [BsonElement("IsPaused")]
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsPaused { get; set; }
     }

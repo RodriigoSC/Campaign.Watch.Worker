@@ -46,7 +46,7 @@ namespace CampaignWatchWorker.Application.Processor
             _logger.LogInformation("[{ClientName}] Buscando campanhas para processar.", clientName);
             Console.WriteLine($"[{clientName}] Buscando campanhas para processar.");
 
-            var dueCampaigns = await _campaignModelRepository.ObterCampanhasDevidasParaClienteAsync(clientName);
+            var dueCampaigns = await _campaignModelRepository.GetDueCampaignsForClientAsync(clientName);
 
             if (!dueCampaigns.Any())
             {
@@ -63,7 +63,6 @@ namespace CampaignWatchWorker.Application.Processor
                 await ProcessSingleCampaignAsync(campaignModel);
             }
         }
-
         private async Task ProcessSingleCampaignAsync(CampaignModel campaignModel)
         {
             var clientName = campaignModel.ClientName;
@@ -81,7 +80,7 @@ namespace CampaignWatchWorker.Application.Processor
                     Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} não encontrada na origem. Marcando como inativa.");
                     campaignModel.IsActive = false;
                     campaignModel.MonitoringNotes = "Campanha não encontrada na origem.";
-                    await _campaignModelRepository.AtualizarCampanhaAsync(campaignModel);
+                    await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                     return;
                 }
 
@@ -113,7 +112,7 @@ namespace CampaignWatchWorker.Application.Processor
 
                             if (executionModel.HasMonitoringErrors) errorExecutionCount++;
 
-                            await _executionModelRepository.AtualizarExecucaoAsync(executionModel);
+                            await _executionModelRepository.UpdateExecutionAsync(executionModel);
                             executionModels.Add(executionModel);
                         }
                         catch (Exception ex)
@@ -131,7 +130,7 @@ namespace CampaignWatchWorker.Application.Processor
                 updatedCampaignModel.TotalExecutionsProcessed = executionModels.Count;
                 updatedCampaignModel.NextExecutionMonitoring = CalculateNextCheck(updatedCampaignModel);
 
-                await _campaignModelRepository.AtualizarCampanhaAsync(updatedCampaignModel);
+                await _campaignModelRepository.UpdateCampaignAsync(updatedCampaignModel);
 
                 _logger.LogInformation("[{ClientName}] Campanha {CampaignId} processada. Próxima checagem: {NextCheck}", clientName, campaignSourceId, updatedCampaignModel.NextExecutionMonitoring);
                 Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} processada. Próxima checagem: {updatedCampaignModel.NextExecutionMonitoring}");
@@ -149,7 +148,7 @@ namespace CampaignWatchWorker.Application.Processor
                     campaignModel.MonitoringStatus = MonitoringStatusEnum.Failed;
                     campaignModel.LastCheckMonitoring = DateTime.UtcNow;
                     campaignModel.NextExecutionMonitoring = DateTime.UtcNow.AddMinutes(15);
-                    await _campaignModelRepository.AtualizarCampanhaAsync(campaignModel);
+                    await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                 }
                 catch 
                 {
@@ -157,7 +156,6 @@ namespace CampaignWatchWorker.Application.Processor
                 }
             }
         }
-
         private DateTime? CalculateNextCheck(CampaignModel campaign)
         {
             var now = DateTime.UtcNow;
@@ -211,7 +209,6 @@ namespace CampaignWatchWorker.Application.Processor
 
             return now.AddMinutes(30);
         }
-
         public async Task DiscoverNewCampaignsAsync()
         {
             var clientName = _tenantContext.Client.Name;
@@ -240,7 +237,7 @@ namespace CampaignWatchWorker.Application.Processor
                     campaignModel.NextExecutionMonitoring = DateTime.UtcNow;
                     campaignModel.FirstMonitoringAt = DateTime.UtcNow;
 
-                    await _campaignModelRepository.AtualizarCampanhaAsync(campaignModel);
+                    await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                 }
                 catch (Exception ex)
                 {

@@ -155,7 +155,7 @@ namespace CampaignWatchWorker.Application.Mappers
             }
             else
             {
-                step.MonitoringNotes = "AVISO: Dados de integração do canal não encontrados na coleção consolidada.";
+                step.MonitoringNotes = "AVISO: Dados de integração do canal não encontrados na collection Deliverability.";
             }
         }
 

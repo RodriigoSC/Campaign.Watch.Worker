@@ -27,24 +27,13 @@ namespace CampaignWatchWorker.Data.Repositories
             CreateIndexesAsync(new List<CreateIndexModel<ExecutionModel>> { uniqueIndexModel, queryIndexModel }).GetAwaiter().GetResult();
         }
 
-        public async Task<ExecutionModel> CriarExecucaoAsync(ExecutionModel executionModel)
+        public async Task<ExecutionModel> CreateExecutionAsync(ExecutionModel executionModel)
         {
             await _collection.InsertOneAsync(executionModel);
             return executionModel;
-        }
+        }      
 
-        /*public async Task<bool> AtualizarExecucaoAsync(ExecutionModel executionModel)
-        {
-            var filter = Builders<ExecutionModel>.Filter.And(
-                Builders<ExecutionModel>.Filter.Eq(e => e.OriginalCampaignId, executionModel.OriginalCampaignId),
-                Builders<ExecutionModel>.Filter.Eq(e => e.OriginalExecutionId, executionModel.OriginalExecutionId)
-            );
-
-            var result = await _collection.ReplaceOneAsync(filter, executionModel, new ReplaceOptions { IsUpsert = true });
-            return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
-        }*/
-
-        public async Task<bool> AtualizarExecucaoAsync(ExecutionModel executionModel)
+        public async Task<bool> UpdateExecutionAsync(ExecutionModel executionModel)
         {
             var filter = Builders<ExecutionModel>.Filter.And(
                 Builders<ExecutionModel>.Filter.Eq(e => e.OriginalCampaignId, executionModel.OriginalCampaignId),
