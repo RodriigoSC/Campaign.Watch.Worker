@@ -16,8 +16,8 @@ namespace CampaignWatchWorker.Application.Processor
         private readonly IExecutionModelRepository _executionModelRepository;
         private readonly ICampaignMapper _campaignMapper;
         private readonly ICampaignHealthAnalyzer _healthAnalyzer;
-        private readonly ITenantContext _tenantContext; 
-        private readonly IChannelReadModelService _channelReadModelService; 
+        private readonly ITenantContext _tenantContext;
+        private readonly IChannelReadModelService _channelReadModelService;
         private readonly ILogger<ProcessorApplication> _logger;
 
         public ProcessorApplication(
@@ -27,7 +27,7 @@ namespace CampaignWatchWorker.Application.Processor
             ICampaignMapper campaignMapper,
             ICampaignHealthAnalyzer healthAnalyzer,
             ITenantContext tenantContext,
-            IChannelReadModelService channelReadModelService, 
+            IChannelReadModelService channelReadModelService,
             ILogger<ProcessorApplication> logger)
         {
             _campaignReadModelService = campaignReadModelService;
@@ -63,6 +63,7 @@ namespace CampaignWatchWorker.Application.Processor
                 await ProcessSingleCampaignAsync(campaignModel);
             }
         }
+
         private async Task ProcessSingleCampaignAsync(CampaignModel campaignModel)
         {
             var clientName = campaignModel.ClientName;
@@ -79,6 +80,7 @@ namespace CampaignWatchWorker.Application.Processor
                     _logger.LogWarning("[{ClientName}] Campanha {CampaignId} não encontrada na origem. Marcando como inativa.", clientName, campaignSourceId);
                     Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} não encontrada na origem. Marcando como inativa.");
                     campaignModel.IsActive = false;
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.Failed;
                     campaignModel.MonitoringNotes = "Campanha não encontrada na origem.";
                     await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                     return;
@@ -86,10 +88,10 @@ namespace CampaignWatchWorker.Application.Processor
 
                 var updatedCampaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
 
+                // Preservar dados de monitoramento existentes
                 updatedCampaignModel.Id = campaignModel.Id;
                 updatedCampaignModel.CreatedAt = campaignModel.CreatedAt;
                 updatedCampaignModel.FirstMonitoringAt = campaignModel.FirstMonitoringAt;
-
 
                 var executionsRead = await _campaignReadModelService.GetExecutionsByCampaign(campaignSourceId);
                 var executionModels = new List<ExecutionModel>();
@@ -112,6 +114,7 @@ namespace CampaignWatchWorker.Application.Processor
 
                             if (executionModel.HasMonitoringErrors) errorExecutionCount++;
 
+                            // Persiste o estado da execução (Upsert)
                             await _executionModelRepository.UpdateExecutionAsync(executionModel);
                             executionModels.Add(executionModel);
                         }
@@ -123,23 +126,31 @@ namespace CampaignWatchWorker.Application.Processor
                     }
                 }
 
+                // Analisa a saúde da campanha
                 var campaignHealth = await _healthAnalyzer.AnalyzeCampaignHealthAsync(updatedCampaignModel, executionModels);
                 updatedCampaignModel.HealthStatus = campaignHealth;
                 updatedCampaignModel.LastCheckMonitoring = DateTime.UtcNow;
                 updatedCampaignModel.ExecutionsWithErrors = errorExecutionCount;
                 updatedCampaignModel.TotalExecutionsProcessed = executionModels.Count;
-                updatedCampaignModel.NextExecutionMonitoring = CalculateNextCheck(updatedCampaignModel);
+
+                // **LÓGICA REATORADA**
+                // Calcula o próximo status de monitoramento e a próxima checagem
+                (var newStatus, var nextCheck) = CalculateNextCheck(updatedCampaignModel);
+                updatedCampaignModel.MonitoringStatus = newStatus;
+                updatedCampaignModel.NextExecutionMonitoring = nextCheck;
 
                 await _campaignModelRepository.UpdateCampaignAsync(updatedCampaignModel);
 
-                _logger.LogInformation("[{ClientName}] Campanha {CampaignId} processada. Próxima checagem: {NextCheck}", clientName, campaignSourceId, updatedCampaignModel.NextExecutionMonitoring);
-                Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} processada. Próxima checagem: {updatedCampaignModel.NextExecutionMonitoring}");
+                _logger.LogInformation("[{ClientName}] Campanha {CampaignId} processada. Novo Status: {Status}. Próxima checagem: {NextCheck}",
+                    clientName, campaignSourceId, updatedCampaignModel.MonitoringStatus, updatedCampaignModel.NextExecutionMonitoring);
+                Console.WriteLine($"[{clientName}] Campanha {campaignSourceId} processada. Novo Status: {updatedCampaignModel.MonitoringStatus}. Próxima checagem: {updatedCampaignModel.NextExecutionMonitoring}");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[{ClientName}] ERRO FATAL ao processar Campanha {CampaignId}", clientName, campaignSourceId);
                 Console.WriteLine($"[{clientName}] ERRO FATAL ao processar Campanha {campaignSourceId}: {ex}");
 
+                // Tenta registrar o erro no modelo da campanha
                 try
                 {
                     campaignModel.HealthStatus ??= new MonitoringHealthStatus();
@@ -147,68 +158,85 @@ namespace CampaignWatchWorker.Application.Processor
                     campaignModel.HealthStatus.LastMessage = $"Erro fatal no processamento: {ex.Message}";
                     campaignModel.MonitoringStatus = MonitoringStatusEnum.Failed;
                     campaignModel.LastCheckMonitoring = DateTime.UtcNow;
-                    campaignModel.NextExecutionMonitoring = DateTime.UtcNow.AddMinutes(15);
+                    campaignModel.NextExecutionMonitoring = DateTime.UtcNow.AddMinutes(15); // Tenta novamente em 15 min
                     await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                 }
-                catch 
+                catch (Exception persistenceEx)
                 {
-                    
+                    _logger.LogCritical(persistenceEx, "[{ClientName}] Falha ao salvar estado de erro fatal da campanha {CampaignId}", clientName, campaignSourceId);
                 }
             }
         }
-        private DateTime? CalculateNextCheck(CampaignModel campaign)
+
+        
+        private (MonitoringStatusEnum, DateTime?) CalculateNextCheck(CampaignModel campaign)
         {
             var now = DateTime.UtcNow;
 
             if (!campaign.IsActive || campaign.IsDeleted)
             {
-                return null;
+                return (MonitoringStatusEnum.Completed, null);
             }
 
             if (campaign.HealthStatus?.HasIntegrationErrors == true)
             {
-                return now.AddMinutes(5);
+                return (MonitoringStatusEnum.Failed, now.AddMinutes(5));
             }
 
             if (campaign.CampaignType == CampaignTypeEnum.Pontual)
-            {
-                if (campaign.StatusCampaign == CampaignStatusEnum.Completed && campaign.HealthStatus?.HasIntegrationErrors == false)
+            {                
+                if (campaign.StatusCampaign == CampaignStatusEnum.Completed && campaign.HealthStatus?.HasPendingExecution == true)
                 {
-                    return null;
+                    _logger.LogWarning("[{ClientName}] Campanha PONTUAL {CampaignId} marcada como 'Completed', mas 'HasPendingExecution' é true. Mantendo monitoramento.", campaign.ClientName, campaign.IdCampaign);
+                    return (MonitoringStatusEnum.InProgress, now.AddMinutes(10));
                 }
-                if (campaign.Scheduler != null && campaign.Scheduler.StartDateTime > now)
+
+                if (campaign.StatusCampaign == CampaignStatusEnum.Completed)
                 {
-                    return campaign.Scheduler.StartDateTime.AddMinutes(-5);
+                    return (MonitoringStatusEnum.Completed, null);
                 }
-                if (campaign.StatusCampaign == CampaignStatusEnum.Executing || campaign.HealthStatus?.HasPendingExecution == true)
+
+                if (campaign.StatusCampaign == CampaignStatusEnum.Scheduled && campaign.Scheduler != null && campaign.Scheduler.StartDateTime > now)
                 {
-                    return now.AddMinutes(10);
+                    return (MonitoringStatusEnum.WaitingForNextExecution, campaign.Scheduler.StartDateTime.AddMinutes(-5));
                 }
-                return now.AddMinutes(30);
+
+                if (campaign.StatusCampaign == CampaignStatusEnum.Executing || campaign.StatusCampaign == CampaignStatusEnum.Scheduled)
+                {
+                    return (MonitoringStatusEnum.InProgress, now.AddMinutes(10));
+                }
+
+                if (campaign.StatusCampaign == CampaignStatusEnum.Error)
+                {
+                    return (MonitoringStatusEnum.Failed, null);
+                }
+
+                return (MonitoringStatusEnum.Completed, null);
             }
 
             if (campaign.CampaignType == CampaignTypeEnum.Recorrente)
             {
+                if (campaign.Scheduler?.EndDateTime.HasValue == true && now > campaign.Scheduler.EndDateTime.Value)
+                {
+                    return (MonitoringStatusEnum.Completed, null);
+                }
+
                 if (campaign.HealthStatus?.HasPendingExecution == true)
                 {
-                    return now.AddMinutes(10);
+                    return (MonitoringStatusEnum.InProgress, now.AddMinutes(10));
                 }
-                if (campaign.Scheduler != null)
+
+                if (campaign.Scheduler != null && now < campaign.Scheduler.StartDateTime)
                 {
-                    if (now < campaign.Scheduler.StartDateTime)
-                    {
-                        return campaign.Scheduler.StartDateTime.AddMinutes(-5);
-                    }
-                    if (campaign.Scheduler.EndDateTime.HasValue && now > campaign.Scheduler.EndDateTime.Value)
-                    {
-                        return null;
-                    }
+                    return (MonitoringStatusEnum.WaitingForNextExecution, campaign.Scheduler.StartDateTime.AddMinutes(-5));
                 }
-                return now.AddHours(1);
+
+                return (MonitoringStatusEnum.WaitingForNextExecution, now.AddHours(1));
             }
 
-            return now.AddMinutes(30);
+            return (MonitoringStatusEnum.Pending, now.AddMinutes(30));
         }
+
         public async Task DiscoverNewCampaignsAsync()
         {
             var clientName = _tenantContext.Client.Name;
@@ -231,11 +259,30 @@ namespace CampaignWatchWorker.Application.Processor
             {
                 try
                 {
-                    var campaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
+                    var existingCampaign = await _campaignModelRepository.GetCampaignByIdAsync(clientName, campaignReadModel.Id);
+                                        
+                    if (existingCampaign != null &&
+                        (existingCampaign.MonitoringStatus == MonitoringStatusEnum.Completed ||
+                         existingCampaign.MonitoringStatus == MonitoringStatusEnum.Failed))
+                    {                        
+                        if (existingCampaign.StatusCampaign == (CampaignStatusEnum)campaignReadModel.Status)
+                        {
+                            continue;
+                        }
 
-                    campaignModel.MonitoringStatus = MonitoringStatusEnum.Pending;
-                    campaignModel.NextExecutionMonitoring = DateTime.UtcNow;
-                    campaignModel.FirstMonitoringAt = DateTime.UtcNow;
+                        _logger.LogInformation("[{ClientName}] Campanha {CampaignId} mudou de status na origem. Reativando monitoramento.", clientName, campaignReadModel.Id);
+                    }
+
+                    var campaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
+                    
+                    if (existingCampaign != null)
+                    {
+                        campaignModel.Id = existingCampaign.Id;
+                        campaignModel.FirstMonitoringAt = existingCampaign.FirstMonitoringAt;
+                        campaignModel.CreatedAt = existingCampaign.CreatedAt;
+                    }
+
+                    SetInitialMonitoringState(campaignModel);
 
                     await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                 }
@@ -244,6 +291,67 @@ namespace CampaignWatchWorker.Application.Processor
                     _logger.LogError(ex, "[{ClientName}] Falha ao sincronizar campanha {CampaignId} da origem.", clientName, campaignReadModel.Id);
                     Console.WriteLine($"[{clientName}] Falha ao sincronizar campanha {campaignReadModel.Id} da origem: {ex}");
                 }
+            }
+        }
+        
+        private void SetInitialMonitoringState(CampaignModel campaignModel)
+        {
+            var now = DateTime.UtcNow;
+
+            campaignModel.FirstMonitoringAt ??= now;
+
+            if (campaignModel.CampaignType == CampaignTypeEnum.Pontual)
+            {
+                if (campaignModel.StatusCampaign == CampaignStatusEnum.Scheduled && campaignModel.Scheduler != null && campaignModel.Scheduler.StartDateTime > now)
+                {
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.WaitingForNextExecution;
+                    campaignModel.NextExecutionMonitoring = campaignModel.Scheduler.StartDateTime.AddMinutes(-5);
+                }
+                else if (campaignModel.StatusCampaign == CampaignStatusEnum.Executing || campaignModel.StatusCampaign == CampaignStatusEnum.Scheduled)
+                {
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.InProgress;
+                    campaignModel.NextExecutionMonitoring = now;
+                }
+                else if (campaignModel.StatusCampaign == CampaignStatusEnum.Draft)
+                {
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.Pending;
+                    campaignModel.NextExecutionMonitoring = now.AddHours(1);
+                }
+                
+                else
+                {
+                    campaignModel.MonitoringStatus = campaignModel.StatusCampaign switch
+                    {
+                        CampaignStatusEnum.Completed => MonitoringStatusEnum.Completed,
+                        CampaignStatusEnum.Error => MonitoringStatusEnum.Failed,
+                        CampaignStatusEnum.Canceled => MonitoringStatusEnum.Completed,
+                        _ => MonitoringStatusEnum.Pending
+                    };
+                    campaignModel.NextExecutionMonitoring = now;
+                }
+            }
+            else if (campaignModel.CampaignType == CampaignTypeEnum.Recorrente)
+            {
+                if (campaignModel.StatusCampaign == CampaignStatusEnum.Scheduled && campaignModel.Scheduler != null && campaignModel.Scheduler.StartDateTime > now)
+                {
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.WaitingForNextExecution;
+                    campaignModel.NextExecutionMonitoring = campaignModel.Scheduler.StartDateTime.AddMinutes(-5);
+                }
+                else if (campaignModel.Scheduler?.EndDateTime.HasValue == true && now > campaignModel.Scheduler.EndDateTime.Value)
+                {
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.Completed;
+                    campaignModel.NextExecutionMonitoring = now; 
+                }
+                else
+                {
+                    campaignModel.MonitoringStatus = MonitoringStatusEnum.InProgress;
+                    campaignModel.NextExecutionMonitoring = now;
+                }
+            }
+            else
+            {
+                campaignModel.MonitoringStatus = MonitoringStatusEnum.Pending;
+                campaignModel.NextExecutionMonitoring = now;
             }
         }
     }

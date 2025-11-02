@@ -13,8 +13,12 @@ namespace CampaignWatchWorker.Worker
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IClientConfigService _clientConfigService;
 
-        private readonly TimeSpan _healthCheckInterval = TimeSpan.FromMinutes(1);
-        private readonly TimeSpan _discoveryInterval = TimeSpan.FromMinutes(3);
+        //private readonly TimeSpan _healthCheckInterval = TimeSpan.FromMinutes(1);
+        //private readonly TimeSpan _discoveryInterval = TimeSpan.FromMinutes(3);
+
+        private readonly TimeSpan _healthCheckInterval = TimeSpan.FromSeconds(60);
+        private readonly TimeSpan _discoveryInterval = TimeSpan.FromSeconds(30);
+
         private DateTime _lastDiscoveryRun = DateTime.MinValue;
 
         public MultiTenantPollingWorker(ILogger<MultiTenantPollingWorker> logger, IServiceScopeFactory scopeFactory, IClientConfigService clientConfigService)
