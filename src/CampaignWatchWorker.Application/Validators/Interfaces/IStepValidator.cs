@@ -1,5 +1,5 @@
-﻿using CampaignWatchWorker.Domain.Models;
-using CampaignWatchWorker.Domain.Models.Diagnostics;
+﻿using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
+using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
 using CampaignWatchWorker.Domain.Models.Enums;
 
 namespace CampaignWatchWorker.Application.Validators
@@ -8,6 +8,6 @@ namespace CampaignWatchWorker.Application.Validators
     {
         WorkflowStepTypeEnum SupportedStepType { get; }
 
-        Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign);
+        Task<StepDiagnosticModel> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign);
     }
 }

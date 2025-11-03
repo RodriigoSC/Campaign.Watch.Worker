@@ -1,6 +1,8 @@
 using CampaignWatchWorker.Application.Analyzer;
 using CampaignWatchWorker.Application.Mappers;
 using CampaignWatchWorker.Application.Processor;
+using CampaignWatchWorker.Application.Services;
+using CampaignWatchWorker.Application.Services.Interfaces;
 using CampaignWatchWorker.Application.Validators;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +20,11 @@ namespace CampaignWatchWorker.Application.Resolver
 
             // Health Analyzers
             services.AddTransient<ICampaignHealthAnalyzer, CampaignHealthAnalyzer>();
+
+            services.AddTransient<IAlertService, AlertService>();
+
+            services.AddTransient<IEmailDispatcher, LogEmailDispatcher>();
+            services.AddTransient<IWebhookDispatcher, LogWebhookDispatcher>();
 
             // Step Validators
             services.AddTransient<IStepValidator, FilterStepValidator>();

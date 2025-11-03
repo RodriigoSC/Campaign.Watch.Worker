@@ -1,10 +1,10 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace CampaignWatchWorker.Domain.Models
+namespace CampaignWatchWorker.Domain.Models.Entities.Clients
 {
     [BsonIgnoreExtraElements]
-    public class ClientConfig
+    public class ClientMoldel
     {
         [BsonId]
         public ObjectId Id { get; set; }

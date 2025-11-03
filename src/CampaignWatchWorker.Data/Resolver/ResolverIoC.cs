@@ -1,5 +1,6 @@
 using CampaignWatchWorker.Data.Repositories;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
+using CampaignWatchWorker.Domain.Models.Interfaces.Repositories.Alerts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CampaignWatchWorker.Data.Resolver
@@ -10,6 +11,9 @@ namespace CampaignWatchWorker.Data.Resolver
         {
             services.AddTransient<ICampaignModelRepository, CampaignModelRepository>();
             services.AddTransient<IExecutionModelRepository, ExecutionModelRepository>();
+
+            services.AddTransient<IAlertConfigurationRepository, AlertConfigurationRepository>();
+            services.AddTransient<IAlertHistoryRepository, AlertHistoryRepository>();
 
 
             return services;

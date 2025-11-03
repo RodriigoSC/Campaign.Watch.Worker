@@ -1,11 +1,11 @@
-﻿using CampaignWatchWorker.Domain.Models;
-using CampaignWatchWorker.Domain.Models.Diagnostics;
+﻿using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
+using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
 
 namespace CampaignWatchWorker.Application.Analyzer
 {
     public interface ICampaignHealthAnalyzer
     {
-        Task<ExecutionDiagnostic> AnalyzeExecutionAsync(ExecutionModel execution, CampaignModel campaign);
-        Task<MonitoringHealthStatus> AnalyzeCampaignHealthAsync(CampaignModel campaign, List<ExecutionModel> executions);
+        Task<ExecutionDiagnosticModel> AnalyzeExecutionAsync(ExecutionModel execution, CampaignModel campaign);
+        Task<MonitoringModel> AnalyzeCampaignHealthAsync(CampaignModel campaign, List<ExecutionModel> executions);
     }
 }

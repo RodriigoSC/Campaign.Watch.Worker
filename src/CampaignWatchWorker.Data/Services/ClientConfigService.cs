@@ -1,5 +1,5 @@
 ﻿using CampaignWatchWorker.Data.Factories;
-using CampaignWatchWorker.Domain.Models;
+using CampaignWatchWorker.Domain.Models.Entities.Clients;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -17,18 +17,18 @@ namespace CampaignWatchWorker.Data.Services
             _logger = logger;
         }
 
-        public async Task<List<ClientConfig>> GetAllActiveClientsAsync()
+        public async Task<List<ClientMoldel>> GetAllActiveClientsAsync()
         {
             try
             {
                 var db = _persistenceFactory.GetDatabase();
-                var collection = db.GetCollection<ClientConfig>("Clients");
+                var collection = db.GetCollection<ClientMoldel>("Clients");
                 return await collection.Find(c => c.IsActive).ToListAsync();
             }
             catch (Exception ex)
             {
                 _logger.LogCritical(ex, "Não foi possível carregar a configuração dos clientes do banco de dados.");
-                return new List<ClientConfig>();
+                return new List<ClientMoldel>();
             }
         }
     }

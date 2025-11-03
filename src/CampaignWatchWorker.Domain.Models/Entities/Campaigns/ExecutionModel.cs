@@ -2,7 +2,7 @@
 using MongoDB.Bson.Serialization.Attributes;
 
 
-namespace CampaignWatchWorker.Domain.Models
+namespace CampaignWatchWorker.Domain.Models.Entities.Campaigns
 {
     public class ExecutionModel
     {

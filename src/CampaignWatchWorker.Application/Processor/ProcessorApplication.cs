@@ -1,6 +1,7 @@
 ﻿using CampaignWatchWorker.Application.Analyzer;
 using CampaignWatchWorker.Application.Mappers;
-using CampaignWatchWorker.Domain.Models;
+using CampaignWatchWorker.Application.Services.Interfaces;
+using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
 using CampaignWatchWorker.Domain.Models.Enums;
 using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
@@ -18,6 +19,7 @@ namespace CampaignWatchWorker.Application.Processor
         private readonly ICampaignHealthAnalyzer _healthAnalyzer;
         private readonly ITenantContext _tenantContext;
         private readonly IChannelReadModelService _channelReadModelService;
+        private readonly IAlertService _alertService; 
         private readonly ILogger<ProcessorApplication> _logger;
 
         public ProcessorApplication(
@@ -28,6 +30,7 @@ namespace CampaignWatchWorker.Application.Processor
             ICampaignHealthAnalyzer healthAnalyzer,
             ITenantContext tenantContext,
             IChannelReadModelService channelReadModelService,
+            IAlertService alertService,
             ILogger<ProcessorApplication> logger)
         {
             _campaignReadModelService = campaignReadModelService;
@@ -37,6 +40,7 @@ namespace CampaignWatchWorker.Application.Processor
             _healthAnalyzer = healthAnalyzer;
             _tenantContext = tenantContext;
             _channelReadModelService = channelReadModelService;
+            _alertService = alertService;
             _logger = logger;
         }
 
@@ -69,6 +73,8 @@ namespace CampaignWatchWorker.Application.Processor
             var clientName = campaignModel.ClientName;
             var campaignSourceId = campaignModel.IdCampaign;
 
+            CampaignWatchWorker.Domain.Models.Entities.Diagnostics.ExecutionDiagnosticModel? diagnostic = null;
+
             try
             {
                 _logger.LogInformation("[{ClientName}] Processando Campanha ID: {CampaignId}", clientName, campaignSourceId);
@@ -88,7 +94,6 @@ namespace CampaignWatchWorker.Application.Processor
 
                 var updatedCampaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
 
-                // Preservar dados de monitoramento existentes
                 updatedCampaignModel.Id = campaignModel.Id;
                 updatedCampaignModel.CreatedAt = campaignModel.CreatedAt;
                 updatedCampaignModel.FirstMonitoringAt = campaignModel.FirstMonitoringAt;
@@ -108,7 +113,7 @@ namespace CampaignWatchWorker.Application.Processor
                             var executionModel = _campaignMapper.MapToExecutionModel(executionRead, campaignModel.Id, channelData);
                             if (executionModel == null) continue;
 
-                            var diagnostic = await _healthAnalyzer.AnalyzeExecutionAsync(executionModel, updatedCampaignModel);
+                            diagnostic = await _healthAnalyzer.AnalyzeExecutionAsync(executionModel, updatedCampaignModel);
                             executionModel.HasMonitoringErrors = diagnostic.OverallHealth == HealthStatusEnum.Error ||
                                                                  diagnostic.OverallHealth == HealthStatusEnum.Critical;
 
@@ -117,6 +122,9 @@ namespace CampaignWatchWorker.Application.Processor
                             // Persiste o estado da execução (Upsert)
                             await _executionModelRepository.UpdateExecutionAsync(executionModel);
                             executionModels.Add(executionModel);
+
+                            // Verifica alertas para esta execução específica
+                            await _alertService.ProcessAlertsAsync(updatedCampaignModel, diagnostic);
                         }
                         catch (Exception ex)
                         {
@@ -132,9 +140,7 @@ namespace CampaignWatchWorker.Application.Processor
                 updatedCampaignModel.LastCheckMonitoring = DateTime.UtcNow;
                 updatedCampaignModel.ExecutionsWithErrors = errorExecutionCount;
                 updatedCampaignModel.TotalExecutionsProcessed = executionModels.Count;
-
-                // **LÓGICA REATORADA**
-                // Calcula o próximo status de monitoramento e a próxima checagem
+                
                 (var newStatus, var nextCheck) = CalculateNextCheck(updatedCampaignModel);
                 updatedCampaignModel.MonitoringStatus = newStatus;
                 updatedCampaignModel.NextExecutionMonitoring = nextCheck;
@@ -150,20 +156,24 @@ namespace CampaignWatchWorker.Application.Processor
                 _logger.LogError(ex, "[{ClientName}] ERRO FATAL ao processar Campanha {CampaignId}", clientName, campaignSourceId);
                 Console.WriteLine($"[{clientName}] ERRO FATAL ao processar Campanha {campaignSourceId}: {ex}");
 
-                // Tenta registrar o erro no modelo da campanha
                 try
                 {
-                    campaignModel.HealthStatus ??= new MonitoringHealthStatus();
+                    campaignModel.HealthStatus ??= new MonitoringModel();
                     campaignModel.HealthStatus.HasIntegrationErrors = true;
                     campaignModel.HealthStatus.LastMessage = $"Erro fatal no processamento: {ex.Message}";
                     campaignModel.MonitoringStatus = MonitoringStatusEnum.Failed;
                     campaignModel.LastCheckMonitoring = DateTime.UtcNow;
-                    campaignModel.NextExecutionMonitoring = DateTime.UtcNow.AddMinutes(15); // Tenta novamente em 15 min
+                    campaignModel.NextExecutionMonitoring = DateTime.UtcNow.AddMinutes(15);
                     await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
                 }
                 catch (Exception persistenceEx)
                 {
                     _logger.LogCritical(persistenceEx, "[{ClientName}] Falha ao salvar estado de erro fatal da campanha {CampaignId}", clientName, campaignSourceId);
+                }
+
+                if (diagnostic != null)
+                {
+                    await _alertService.ProcessAlertsAsync(campaignModel, diagnostic);
                 }
             }
         }

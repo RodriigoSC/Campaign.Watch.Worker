@@ -1,6 +1,6 @@
 ﻿using CampaignWatchWorker.Application.Validators;
-using CampaignWatchWorker.Domain.Models;
-using CampaignWatchWorker.Domain.Models.Diagnostics;
+using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
+using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
 using CampaignWatchWorker.Domain.Models.Enums;
 using Microsoft.Extensions.Logging;
 
@@ -17,20 +17,20 @@ namespace CampaignWatchWorker.Application.Analyzer
             _validators = validators.ToDictionary(v => v.SupportedStepType, v => v);
         }
 
-        public async Task<ExecutionDiagnostic> AnalyzeExecutionAsync(ExecutionModel execution, CampaignModel campaign)
+        public async Task<ExecutionDiagnosticModel> AnalyzeExecutionAsync(ExecutionModel execution, CampaignModel campaign)
         {
-            var diagnostic = new ExecutionDiagnostic
+            var diagnostic = new ExecutionDiagnosticModel
             {
                 ExecutionId = execution.OriginalExecutionId,
                 AnalyzedAt = DateTime.UtcNow,
-                StepDiagnostics = new List<StepDiagnostic>()
+                StepDiagnostics = new List<StepDiagnosticModel>()
             };
 
             try
             {
                 foreach (var step in execution.Steps)
                 {
-                    StepDiagnostic stepDiag;
+                    StepDiagnosticModel stepDiag;
 
                     if (Enum.TryParse<WorkflowStepTypeEnum>(step.Type, true, out var stepType))
                     {
@@ -46,7 +46,7 @@ namespace CampaignWatchWorker.Application.Analyzer
                     }
                     else
                     {
-                        stepDiag = new StepDiagnostic
+                        stepDiag = new StepDiagnosticModel
                         {
                             StepId = step.OriginalStepId,
                             StepName = step.Name,
@@ -73,9 +73,9 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return diagnostic;
         }
-        public async Task<MonitoringHealthStatus> AnalyzeCampaignHealthAsync(CampaignModel campaign, List<ExecutionModel> executions)
+        public async Task<MonitoringModel> AnalyzeCampaignHealthAsync(CampaignModel campaign, List<ExecutionModel> executions)
         {
-            var healthStatus = new MonitoringHealthStatus
+            var healthStatus = new MonitoringModel
             {
                 IsFullyVerified = true,
                 HasPendingExecution = false,
@@ -147,9 +147,9 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return healthStatus;
         }
-        private StepDiagnostic CreateGenericStepDiagnostic(WorkflowStep step)
+        private StepDiagnosticModel CreateGenericStepDiagnostic(WorkflowStep step)
         {
-            var diagnostic = new StepDiagnostic
+            var diagnostic = new StepDiagnosticModel
             {
                 StepId = step.OriginalStepId,
                 StepName = step.Name,
@@ -175,7 +175,7 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return diagnostic;
         }
-        private HealthStatusEnum DetermineOverallHealth(List<StepDiagnostic> stepDiagnostics)
+        private HealthStatusEnum DetermineOverallHealth(List<StepDiagnosticModel> stepDiagnostics)
         {
             if (!stepDiagnostics.Any())
                 return HealthStatusEnum.Healthy;
@@ -191,7 +191,7 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return HealthStatusEnum.Healthy;
         }
-        private string GenerateExecutionSummary(ExecutionDiagnostic diagnostic, ExecutionModel execution)
+        private string GenerateExecutionSummary(ExecutionDiagnosticModel diagnostic, ExecutionModel execution)
         {
             var criticalIssues = diagnostic.StepDiagnostics.Count(s => s.Severity == HealthStatusEnum.Critical);
             var errors = diagnostic.StepDiagnostics.Count(s => s.Severity == HealthStatusEnum.Error);
@@ -214,7 +214,7 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return $"Execução saudável. Status: {execution.Status}";
         }
-        private string AnalyzePonctualCampaign(CampaignModel campaign, List<ExecutionModel> executions, MonitoringHealthStatus healthStatus)
+        private string AnalyzePonctualCampaign(CampaignModel campaign, List<ExecutionModel> executions, MonitoringModel healthStatus)
         {
             var lastExecution = executions.OrderByDescending(e => e.StartDate).FirstOrDefault();
 
@@ -262,7 +262,7 @@ namespace CampaignWatchWorker.Application.Analyzer
 
             return $"Campanha pontual - Status: {campaign.StatusCampaign}";
         }
-        private string AnalyzeRecurrentCampaign(CampaignModel campaign, List<ExecutionModel> executions, MonitoringHealthStatus healthStatus)
+        private string AnalyzeRecurrentCampaign(CampaignModel campaign, List<ExecutionModel> executions, MonitoringModel healthStatus)
         {
             var completedExecutions = executions.Count(e => e.Status == "Completed");
             var failedExecutions = executions.Count(e => e.Status == "Error");

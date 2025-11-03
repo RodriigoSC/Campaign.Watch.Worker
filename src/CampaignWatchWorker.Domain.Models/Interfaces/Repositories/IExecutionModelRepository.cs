@@ -1,4 +1,6 @@
-﻿namespace CampaignWatchWorker.Domain.Models.Interfaces.Repositories
+﻿using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
+
+namespace CampaignWatchWorker.Domain.Models.Interfaces.Repositories
 {
     public interface IExecutionModelRepository
     {

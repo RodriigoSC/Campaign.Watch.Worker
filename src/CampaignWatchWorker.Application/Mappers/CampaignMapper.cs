@@ -1,4 +1,4 @@
-﻿using CampaignWatchWorker.Domain.Models;
+﻿using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
 using CampaignWatchWorker.Domain.Models.Enums;
 using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Read.Campaign;
@@ -36,7 +36,7 @@ namespace CampaignWatchWorker.Application.Mappers
                 ModifiedAt = campaignReadModel.ModifiedAt,
                 ProjectId = campaignReadModel.ProjectId,
                 Scheduler = MapScheduler(campaignReadModel.Scheduler),
-                HealthStatus = new MonitoringHealthStatus(),
+                HealthStatus = new MonitoringModel(),
                 WorkflowConfiguration = new Dictionary<string, WorkflowStepConfig>()
             };
             
@@ -194,11 +194,11 @@ namespace CampaignWatchWorker.Application.Mappers
                    Enum.TryParse(workflow.ExecutionData["ChannelName"].AsString, out channelType);
         }
 
-        private Domain.Models.Scheduler MapScheduler(SchedulerReadModel scheduler)
+        private Scheduler MapScheduler(SchedulerReadModel scheduler)
         {
             if (scheduler == null) return null!;
 
-            return new Domain.Models.Scheduler
+            return new Domain.Models.Entities.Campaigns.Scheduler
             {
                 Crontab = scheduler.Crontab,
                 EndDateTime = scheduler.EndDateTime,

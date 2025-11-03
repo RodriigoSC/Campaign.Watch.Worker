@@ -1,9 +1,8 @@
-﻿
-using CampaignWatchWorker.Domain.Models.Enums;
+﻿using CampaignWatchWorker.Domain.Models.Enums;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace CampaignWatchWorker.Domain.Models
+namespace CampaignWatchWorker.Domain.Models.Entities.Campaigns
 {
     public class CampaignModel
     {
@@ -27,7 +26,7 @@ namespace CampaignWatchWorker.Domain.Models
         public MonitoringStatusEnum MonitoringStatus { get; set; }
         public DateTime? NextExecutionMonitoring { get; set; }
         public DateTime? LastCheckMonitoring { get; set; }
-        public MonitoringHealthStatus HealthStatus { get; set; }
+        public MonitoringModel HealthStatus { get; set; }
 
         [BsonRepresentation(BsonType.Boolean)]
         public bool IsDeleted { get; set; }

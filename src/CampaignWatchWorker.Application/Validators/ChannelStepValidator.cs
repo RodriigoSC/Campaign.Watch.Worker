@@ -1,5 +1,5 @@
-﻿using CampaignWatchWorker.Domain.Models;
-using CampaignWatchWorker.Domain.Models.Diagnostics;
+﻿using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
+using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
 using CampaignWatchWorker.Domain.Models.Enums;
 
 namespace CampaignWatchWorker.Application.Validators
@@ -12,9 +12,9 @@ namespace CampaignWatchWorker.Application.Validators
         private const double WarningErrorRate = 0.2;  // 20%
         private static readonly TimeSpan FileProcessingTimeout = TimeSpan.FromHours(1);
 
-        public async Task<StepDiagnostic> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
+        public async Task<StepDiagnosticModel> ValidateAsync(WorkflowStep step, ExecutionModel execution, CampaignModel campaign)
         {
-            var diagnostic = new StepDiagnostic
+            var diagnostic = new StepDiagnosticModel
             {
                 StepId = step.OriginalStepId,
                 StepName = step.Name,

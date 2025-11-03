@@ -1,8 +1,8 @@
 ﻿using CampaignWatchWorker.Domain.Models.Enums;
 
-namespace CampaignWatchWorker.Domain.Models.Diagnostics
+namespace CampaignWatchWorker.Domain.Models.Entities.Diagnostics
 {
-    public class StepDiagnostic
+    public class StepDiagnosticModel
     {
         public string StepId { get; set; }
         public string StepName { get; set; }

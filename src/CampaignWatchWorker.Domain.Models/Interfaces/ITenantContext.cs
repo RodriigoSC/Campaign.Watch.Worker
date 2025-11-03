@@ -1,9 +1,11 @@
-﻿namespace CampaignWatchWorker.Domain.Models.Interfaces
+﻿using CampaignWatchWorker.Domain.Models.Entities.Clients;
+
+namespace CampaignWatchWorker.Domain.Models.Interfaces
 {
     public interface ITenantContext
     {
-        ClientConfig Client { get; }
+        ClientMoldel Client { get; }
 
-        void SetClient(ClientConfig client);
+        void SetClient(ClientMoldel client);
     }
 }
