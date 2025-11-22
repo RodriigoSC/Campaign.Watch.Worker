@@ -1,9 +1,9 @@
-﻿namespace CampaignWatchWorker.Application.Processor
+﻿using CampaignWatchWorker.Application.DTOs;
+
+namespace CampaignWatchWorker.Application.Processor
 {
     public interface IProcessorApplication
     {
-        Task DiscoverNewCampaignsAsync();
-
-        Task ProcessCampaignByEventAsync(string campaignId);
+        Task ProcessProjectScopeAsync(ProjectQueueMessage message);
     }
 }

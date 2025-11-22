@@ -16,6 +16,7 @@ namespace CampaignWatchWorker.Infra.Campaign.Services
             _factory = factory;
         }
 
+
         public async Task<IEnumerable<CampaignReadModel>> GetCampaigns()
         {
             var db = _factory.GetDatabase();
@@ -81,6 +82,18 @@ namespace CampaignWatchWorker.Infra.Campaign.Services
             var finalFilter = activeFilter & (statusFilter | recentFinishedFilter);
 
             return await collection.Find(finalFilter).ToListAsync();
+        }
+
+        public async Task<IEnumerable<CampaignReadModel>> GetCampaignsByProjectAsync(string projectId)
+        {
+            var db = _factory.GetDatabase();
+            var collection = db.GetCollection<CampaignReadModel>("Campaign");
+
+            var filterBuilder = Builders<CampaignReadModel>.Filter;
+            var filter = filterBuilder.Eq(x => x.ProjectId, projectId) &
+                         filterBuilder.Eq(x => x.IsDeleted, false);
+
+            return await collection.Find(filter).ToListAsync();
         }
     }
 }
