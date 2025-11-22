@@ -55,8 +55,17 @@ namespace CampaignWatchWorker.Infra.Campaign.Services
             var collection = db.GetCollection<CampaignReadModel>("Campaign");
 
             var filterBuilder = Builders<CampaignReadModel>.Filter;
+
+            var statusFilter = filterBuilder.In(x => x.Status, new[]
+            {
+                (int)CampaignStatusEnum.Scheduled,
+                (int)CampaignStatusEnum.Executing,
+                (int)CampaignStatusEnum.Completed
+            });
+
             var filter = filterBuilder.Eq(x => x.ProjectId, projectId) &
-                         filterBuilder.Eq(x => x.IsDeleted, false);
+                         filterBuilder.Eq(x => x.IsDeleted, false) &
+                         statusFilter;
 
             return await collection.Find(filter).ToListAsync();
         }

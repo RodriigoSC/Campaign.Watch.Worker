@@ -23,9 +23,6 @@ namespace CampaignWatchWorker.Application.Resolver
 
             services.AddTransient<IAlertService, AlertService>();
 
-            services.AddTransient<IEmailDispatcher, LogEmailDispatcher>();
-            services.AddTransient<IWebhookDispatcher, LogWebhookDispatcher>();
-
             // Step Validators
             services.AddTransient<IStepValidator, FilterStepValidator>();
             services.AddTransient<IStepValidator, DecisionSplitStepValidator>();

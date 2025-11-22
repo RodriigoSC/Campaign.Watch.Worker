@@ -31,7 +31,9 @@ namespace CampaignWatchWorker.Worker
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
             _logger.LogInformation("Iniciando Worker na fila: {QueueName}", _settings.QueueName);
+            Console.WriteLine($"[{timestamp}] 🚀 Worker iniciado. Alvo: {_settings.QueueName}");
 
             try
             {
@@ -44,42 +46,57 @@ namespace CampaignWatchWorker.Worker
             catch (Exception ex)
             {
                 _logger.LogCritical(ex, "Falha fatal no Worker.");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 💀 FALHA FATAL no Worker: {ex.Message}");
             }
         }
 
         private void InitializeConsumer()
         {
-            _channel = _connection.CreateModel();
+            try
+            {
+                _channel = _connection.CreateModel();
 
-            _channel.QueueDeclare(
-                queue: _settings.QueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null);
+                _channel.QueueDeclare(
+                    queue: _settings.QueueName,
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: null);
 
-            _channel.BasicQos(prefetchSize: 0, prefetchCount: (ushort)_settings.PrefetchCount, global: false);
+                _channel.BasicQos(prefetchSize: 0, prefetchCount: (ushort)_settings.PrefetchCount, global: false);
 
-            var consumer = new AsyncEventingBasicConsumer(_channel);
-            consumer.Received += ProcessMessageAsync;
+                var consumer = new AsyncEventingBasicConsumer(_channel);
+                consumer.Received += ProcessMessageAsync;
 
-            _channel.BasicConsume(queue: _settings.QueueName, autoAck: false, consumer: consumer);
+                _channel.BasicConsume(queue: _settings.QueueName, autoAck: false, consumer: consumer);
 
-            _logger.LogInformation("Consumer registrado. Aguardando mensagens...");
+                _logger.LogInformation("Consumer registrado. Aguardando mensagens...");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Consumer registrado e conectado ao RabbitMQ. Aguardando mensagens...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Erro ao inicializar consumer: {ex.Message}");
+                throw;
+            }
         }
 
         private async Task ProcessMessageAsync(object model, BasicDeliverEventArgs ea)
         {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
             try
             {
                 var body = ea.Body.ToArray();
                 var jsonMessage = Encoding.UTF8.GetString(body);
+
+                Console.WriteLine($"[{timestamp}] 📨 Mensagem recebida (Tag: {ea.DeliveryTag}). Payload size: {body.Length} bytes.");
 
                 var messageData = JsonSerializer.Deserialize<ProjectQueueMessage>(jsonMessage);
 
                 if (messageData == null || string.IsNullOrEmpty(messageData.ClientName) || string.IsNullOrEmpty(messageData.ProjectId))
                 {
                     _logger.LogWarning("Mensagem inválida descartada: {Message}", jsonMessage);
+                    Console.WriteLine($"[{timestamp}] ⚠️ Mensagem inválida descartada (Dados incompletos). JSON: {jsonMessage}");
+
                     _channel.BasicNack(ea.DeliveryTag, false, false);
                     return;
                 }
@@ -95,9 +112,13 @@ namespace CampaignWatchWorker.Worker
                     if (client == null)
                     {
                         _logger.LogError("Cliente '{ClientName}' não encontrado.", messageData.ClientName);
+                        Console.WriteLine($"[{timestamp}] ❌ Cliente '{messageData.ClientName}' não encontrado na configuração. Mensagem rejeitada.");
+
                         _channel.BasicNack(ea.DeliveryTag, false, false);
                         return;
                     }
+
+                    Console.WriteLine($"[{timestamp}] 👤 Cliente identificado: {client.Name}. Iniciando processador...");
 
                     var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
                     tenantContext.SetClient(client);
@@ -107,11 +128,14 @@ namespace CampaignWatchWorker.Worker
                     await processor.ProcessProjectScopeAsync(messageData);
                 }
 
+                Console.WriteLine($"[{timestamp}] ✅ Mensagem processada com sucesso. Enviando ACK.");
                 _channel.BasicAck(ea.DeliveryTag, false);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao processar mensagem.");
+                Console.WriteLine($"[{timestamp}] 💥 Erro no processamento da mensagem: {ex.Message}. Enviando NACK (Requeue).");
+
                 _channel.BasicNack(ea.DeliveryTag, false, true);
             }
         }

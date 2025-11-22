@@ -16,16 +16,16 @@ namespace CampaignWatchWorker.Application.Services
         private readonly IAlertConfigurationRepository _configRepository;
         private readonly IAlertHistoryRepository _historyRepository;
         private readonly ITenantContext _tenantContext;
-        private readonly IEmailDispatcher _emailDispatcher;
-        private readonly IWebhookDispatcher _webhookDispatcher;
+        private readonly IEmailDispatcherService _emailDispatcher;
+        private readonly IWebhookDispatcherService _webhookDispatcher;
         private readonly ILogger<AlertService> _logger;
 
         public AlertService(
             IAlertConfigurationRepository configRepository,
             IAlertHistoryRepository historyRepository,
             ITenantContext tenantContext,
-            IEmailDispatcher emailDispatcher,
-            IWebhookDispatcher webhookDispatcher,
+            IEmailDispatcherService emailDispatcher,
+            IWebhookDispatcherService webhookDispatcher,
             ILogger<AlertService> logger)
         {
             _configRepository = configRepository;
@@ -38,14 +38,15 @@ namespace CampaignWatchWorker.Application.Services
 
         public async Task ProcessAlertsAsync(CampaignModel campaign, ExecutionDiagnosticModel executionDiagnostic)
         {
+            // Se não houver diagnósticos ou a lista estiver vazia, não faz nada
             if (executionDiagnostic?.StepDiagnostics == null || !executionDiagnostic.StepDiagnostics.Any())
             {
-                return; // Sem diagnósticos, sem alertas.
+                return;
             }
 
-            // 1. Buscar regras aplicáveis (Globais + Específicas do Cliente)
+            // 1. Buscar regras de alerta ativas (Do Cliente e Globais)
             var clientRulesTask = _configRepository.GetByScopeAsync(_tenantContext.Client.Id);
-            var globalRulesTask = _configRepository.GetByScopeAsync(null); // null = Global
+            var globalRulesTask = _configRepository.GetByScopeAsync(null); // null = Regras Globais
 
             await Task.WhenAll(clientRulesTask, globalRulesTask);
 
@@ -54,20 +55,18 @@ namespace CampaignWatchWorker.Application.Services
                 .Where(r => r.IsActive)
                 .ToList();
 
-            if (!allRules.Any())
-            {
-                return; // Nenhuma regra de alerta ativa
-            }
+            if (!allRules.Any()) return; // Sem regras, sem alertas.
 
-            // 2. Iterar sobre os problemas (diagnósticos) encontrados
+            // 2. Analisar cada problema encontrado na execução
             foreach (var issue in executionDiagnostic.StepDiagnostics)
             {
-                // Ignorar diagnósticos "Healthy"
+                // Ignora diagnósticos "Healthy" (Sucesso não gera alerta de erro)
                 if (issue.Severity == HealthStatusEnum.Healthy) continue;
 
-                // 3. Verificar quais regras o problema aciona
+                // 3. Encontrar regras que dão "Match" com este problema
                 var matchingRules = FindMatchingRules(issue, allRules);
 
+                // 4. Disparar alertas para as regras encontradas
                 foreach (var rule in matchingRules)
                 {
                     await DispatchAlertAsync(rule, campaign, issue);
@@ -81,37 +80,32 @@ namespace CampaignWatchWorker.Application.Services
 
             foreach (var rule in allRules)
             {
-                // Mapear a gravidade do diagnóstico (Worker) para a gravidade da regra (API)
+                // Conversão de Enums (Domínio do Worker -> Domínio de Alerta)
                 if (!TryMapSeverity(issue.Severity, out AlertSeverity issueSeverity))
                 {
-                    continue; // Gravidade desconhecida
+                    continue;
                 }
 
-                // A. Verificar Gravidade Mínima
-                // Se a regra não define gravidade (null), ela pega qualquer uma.
-                // Se define (ex: Warning), a gravidade do problema (ex: Error) deve ser >=
+                // A. Filtro de Severidade Mínima
+                // Ex: Se a regra pede "Error" e o problema é "Warning", ignoramos.
                 if (rule.MinSeverity.HasValue && issueSeverity < rule.MinSeverity.Value)
                 {
-                    continue; // Problema é menos grave que o mínimo da regra
+                    continue;
                 }
 
-                // B. Verificar Condição
-                // Se a regra não define condição (null), ela pega qualquer uma.
+                // B. Filtro de Tipo de Condição (Opcional na regra)
+                // Ex: Regra específica apenas para "Integração Falhou"
                 if (rule.ConditionType.HasValue)
                 {
-                    // Mapear o tipo de diagnóstico (Worker) para o tipo de condição (API)
-                    if (!TryMapCondition(issue.DiagnosticType, out AlertConditionType issueConditionType))
+                    if (TryMapCondition(issue.DiagnosticType, out AlertConditionType issueConditionType))
                     {
-                        continue; // Diagnóstico não mapeável
-                    }
-
-                    if (issueConditionType != rule.ConditionType.Value)
-                    {
-                        continue; // O tipo de problema não bate com o da regra
+                        if (issueConditionType != rule.ConditionType.Value)
+                        {
+                            continue; // Tipo do problema não bate com a regra
+                        }
                     }
                 }
 
-                // Se passou nas duas verificações, a regra é acionada
                 matchingRules.Add(rule);
             }
 
@@ -122,18 +116,20 @@ namespace CampaignWatchWorker.Application.Services
         {
             try
             {
-                // 1. Disparar a notificação
+                // 1. Envio via Canal Apropriado
                 switch (rule.Type)
                 {
                     case AlertChannelType.Email:
+                        // Aqui chamamos o EmailDispatcherService que criamos anteriormente
                         await _emailDispatcher.SendAsync(rule, campaign, issue);
                         break;
+
                     case AlertChannelType.Webhook:
                         await _webhookDispatcher.SendAsync(rule, campaign, issue);
                         break;
                 }
 
-                // 2. Salvar no histórico
+                // 2. Registro no Histórico (Auditoria)
                 var historyEntry = new AlertHistoryModel
                 {
                     Id = ObjectId.GenerateNewId(),
@@ -145,25 +141,21 @@ namespace CampaignWatchWorker.Application.Services
                     StepName = issue.StepName,
                     DetectedAt = issue.DetectedAt
                 };
-                await _historyRepository.CreateAsync(historyEntry);
 
+                await _historyRepository.CreateAsync(historyEntry);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Falha ao despachar alerta ID {AlertId} para regra '{RuleName}'", rule.Id, rule.Name);
+                _logger.LogError(ex, "Falha ao despachar alerta '{RuleName}' (ID: {RuleId})", rule.Name, rule.Id);
             }
         }
 
-
-        // --- Mapeamento entre Enums do Worker e Enums da API/Alerta ---
+        // --- Helpers de Mapeamento ---
 
         private bool TryMapSeverity(HealthStatusEnum workerSeverity, out AlertSeverity alertSeverity)
         {
             switch (workerSeverity)
             {
-                case HealthStatusEnum.Healthy:
-                    alertSeverity = AlertSeverity.Healthy;
-                    return true;
                 case HealthStatusEnum.Warning:
                     alertSeverity = AlertSeverity.Warning;
                     return true;
@@ -187,6 +179,7 @@ namespace CampaignWatchWorker.Application.Services
                     alertCondition = AlertConditionType.StepFailed;
                     return true;
                 case DiagnosticTypeEnum.ExecutionDelayed:
+                case DiagnosticTypeEnum.WaitStepMissed:
                     alertCondition = AlertConditionType.ExecutionDelayed;
                     return true;
                 case DiagnosticTypeEnum.FilterStuck:
@@ -196,12 +189,12 @@ namespace CampaignWatchWorker.Application.Services
                     alertCondition = AlertConditionType.IntegrationError;
                     return true;
                 case DiagnosticTypeEnum.CampaignNotFinalized:
+                case DiagnosticTypeEnum.IncompleteExecution:
                     alertCondition = AlertConditionType.CampaignNotFinalized;
                     return true;
-                // Outros tipos de diagnóstico do worker (WaitStepMissed, etc.) podem ser mapeados aqui
                 default:
                     alertCondition = default;
-                    return false; // Este tipo de diagnóstico não pode disparar um alerta
+                    return false;
             }
         }
     }

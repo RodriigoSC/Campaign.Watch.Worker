@@ -1,4 +1,5 @@
 ﻿using CampaignWatchWorker.Application.Resolver;
+using CampaignWatchWorker.Application.Services.Interfaces;
 using CampaignWatchWorker.Data.Factories;
 using CampaignWatchWorker.Data.Factories.Common;
 using CampaignWatchWorker.Data.Resolver;
@@ -11,13 +12,16 @@ using CampaignWatchWorker.Infra.Campaign.Factories;
 using CampaignWatchWorker.Infra.Campaign.Resolver;
 using CampaignWatchWorker.Infra.Campaign.Services;
 using CampaignWatchWorker.Infra.MultiTenant;
+using CampaignWatchWorker.Infra.Services.Email;
+using CampaignWatchWorker.Infra.Services.Scheduler;
+using CampaignWatchWorker.Infra.Services.Webhook;
 using DTM_Logging.Ioc;
 using DTM_Vault.Data;
 using DTM_Vault.Data.Factory;
 using DTM_Vault.Data.KeyValue;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using RabbitMQ.Client; 
+using RabbitMQ.Client;
 
 namespace CampaignWatchWorker.Infra.Ioc
 {
@@ -42,23 +46,20 @@ namespace CampaignWatchWorker.Infra.Ioc
 
             var vaultKeyPath = $"monitoring/{environment}/data/keys";
 
-            Console.WriteLine("[Bootstrap] 3. Buscando credenciais RabbitMQ...");
+            Console.WriteLine("[Bootstrap] 3. Buscando configurações no Vault...");
             var rabbitHost = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.host");
             var rabbitUser = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.user");
             var rabbitPass = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.pass");
             var rabbitVHost = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.virtualhost");
-
             var queueName = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.QueueName");
 
-            if (string.IsNullOrEmpty(queueName))
-            {
-                Console.WriteLine("[Bootstrap] AVISO: 'RabbitMQ.QueueName' não encontrado no Vault. Usando 'campaign.monitoring.global'.");
-                queueName = "campaign.monitoring.global";
-            }
-            else
-            {
-                Console.WriteLine($"[Bootstrap] Fila configurada: {queueName}");
-            }
+            var schedulerApiUrl = await vaultService.GetKeyAsync(vaultKeyPath, "SchedulerApiUrl");
+
+            var smtpHost = await vaultService.GetKeyAsync(vaultKeyPath, "SMTP.Host");
+            var smtpPort = await vaultService.GetKeyAsync(vaultKeyPath, "SMTP.Port");
+            var smtpUser = await vaultService.GetKeyAsync(vaultKeyPath, "SMTP.User");
+            var smtpPass = await vaultService.GetKeyAsync(vaultKeyPath, "SMTP.Pass");
+            var smtpFrom = await vaultService.GetKeyAsync(vaultKeyPath, "SMTP.FromAddress");
 
             services.AddSingleton<IConnection>(sp =>
             {
@@ -94,7 +95,26 @@ namespace CampaignWatchWorker.Infra.Ioc
                 var vs = sp.GetRequiredService<IVaultService>();
                 var dbName = vs.GetKeyAsync(vaultKeyPath, "MongoDB.Persistence.database").GetAwaiter().GetResult();
                 return new PersistenceMongoFactory(mongoFactory, dbName);
+            });           
+
+            services.AddHttpClient<ISchedulerService, SchedulerApiService>(client =>
+            {
+                client.BaseAddress = new Uri(schedulerApiUrl);
             });
+
+            var smtpSettings = new SmtpSettings
+            {
+                Host = smtpHost,
+                Port = int.TryParse(smtpPort, out int port) ? port : 25,
+                UserName = smtpUser,
+                Password = smtpPass,
+                FromAddress = smtpFrom,
+                FromName = "Campaign Watch"
+            };
+
+            services.AddSingleton(smtpSettings);
+            services.AddTransient<IEmailDispatcher, EmailDispatcherService>();
+            services.AddTransient<IWebhookDispatcher, WebhookDispatcherService>();
 
             services.AddScoped<ICampaignMongoFactory, CampaignMongoFactory>();
             services.AddSingleton<IClientConfigService, ClientConfigService>();
@@ -106,6 +126,7 @@ namespace CampaignWatchWorker.Infra.Ioc
 
             Console.WriteLine("[Bootstrap] 4. Configuração concluída.");
         }
+
         private static string ValidateIfNull(string? value, string? name)
         {
             if (string.IsNullOrEmpty(value))

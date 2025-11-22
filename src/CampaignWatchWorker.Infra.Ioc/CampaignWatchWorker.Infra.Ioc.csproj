@@ -15,9 +15,11 @@
     <PackageReference Include="DTM_Vault.Data" Version="1.0.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\CampaignWatchWorker.Infra.Services\CampaignWatchWorker.Infra.Services.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Application\CampaignWatchWorker.Application.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Campaign\CampaignWatchWorker.Infra.Campaign.csproj" />
     <ProjectReference Include="..\CampaignWatchWorker.Data\CampaignWatchWorker.Data.csproj" />

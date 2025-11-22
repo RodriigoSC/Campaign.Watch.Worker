@@ -2,9 +2,10 @@
 using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
 using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
 
-namespace CampaignWatchWorker.Application.Services.Interfaces
+
+namespace CampaignWatchWorker.Infra.Services.Email
 {
-    public interface INotificationDispatcher
+    public interface IEmailDispatcherService
     {
         Task SendAsync(AlertConfigurationModel rule, CampaignModel campaign, StepDiagnosticModel issue);
     }
