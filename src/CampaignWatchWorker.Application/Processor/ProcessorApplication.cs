@@ -7,8 +7,8 @@ using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
 using CampaignWatchWorker.Domain.Models.Enums;
 using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services; // Namespace do ISchedulerService
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Scheduler;
 using CampaignWatchWorker.Domain.Models.Read.Campaign;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +24,7 @@ namespace CampaignWatchWorker.Application.Processor
         private readonly ITenantContext _tenantContext;
         private readonly IChannelReadModelService _channelService;
         private readonly IAlertService _alertService;
-        private readonly ISchedulerService _schedulerService; // <--- Nova dependência
+        private readonly ISchedulerApiService _schedulerService;
         private readonly ILogger<ProcessorApplication> _logger;
 
         public ProcessorApplication(
@@ -36,7 +36,7 @@ namespace CampaignWatchWorker.Application.Processor
             ITenantContext tenantContext,
             IChannelReadModelService channelService,
             IAlertService alertService,
-            ISchedulerService schedulerService, // <--- Injeção
+            ISchedulerApiService schedulerService,
             ILogger<ProcessorApplication> logger)
         {
             _readService = readService;
@@ -47,7 +47,7 @@ namespace CampaignWatchWorker.Application.Processor
             _tenantContext = tenantContext;
             _channelService = channelService;
             _alertService = alertService;
-            _schedulerService = schedulerService; // <--- Atribuição
+            _schedulerService = schedulerService;
             _logger = logger;
         }
 
@@ -101,7 +101,7 @@ namespace CampaignWatchWorker.Application.Processor
 
                 var parallelOptions = new ParallelOptions
                 {
-                    MaxDegreeOfParallelism = 10,
+                    MaxDegreeOfParallelism = 1,
                     CancellationToken = CancellationToken.None
                 };
 

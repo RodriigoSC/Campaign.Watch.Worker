@@ -1,7 +1,7 @@
-﻿using CampaignWatchWorker.Application.Services.Interfaces;
-using CampaignWatchWorker.Domain.Models.Entities.Alerts;
+﻿using CampaignWatchWorker.Domain.Models.Entities.Alerts;
 using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
 using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Webhook;
 using Microsoft.Extensions.Logging;
 
 namespace CampaignWatchWorker.Infra.Services.Webhook

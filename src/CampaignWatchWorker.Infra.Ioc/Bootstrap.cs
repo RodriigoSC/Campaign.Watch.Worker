@@ -7,7 +7,10 @@ using CampaignWatchWorker.Data.Services;
 using CampaignWatchWorker.Domain.Models.Configuration;
 using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Email;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Scheduler;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Webhook;
 using CampaignWatchWorker.Infra.Campaign.Factories;
 using CampaignWatchWorker.Infra.Campaign.Resolver;
 using CampaignWatchWorker.Infra.Campaign.Services;
@@ -97,7 +100,7 @@ namespace CampaignWatchWorker.Infra.Ioc
                 return new PersistenceMongoFactory(mongoFactory, dbName);
             });           
 
-            services.AddHttpClient<ISchedulerService, SchedulerApiService>(client =>
+            services.AddHttpClient<ISchedulerApiService, SchedulerApiService>(client =>
             {
                 client.BaseAddress = new Uri(schedulerApiUrl);
             });
@@ -113,8 +116,8 @@ namespace CampaignWatchWorker.Infra.Ioc
             };
 
             services.AddSingleton(smtpSettings);
-            services.AddTransient<IEmailDispatcher, EmailDispatcherService>();
-            services.AddTransient<IWebhookDispatcher, WebhookDispatcherService>();
+            services.AddTransient<IEmailDispatcherService, EmailDispatcherService>();
+            services.AddTransient<IWebhookDispatcherService, WebhookDispatcherService>();
 
             services.AddScoped<ICampaignMongoFactory, CampaignMongoFactory>();
             services.AddSingleton<IClientConfigService, ClientConfigService>();

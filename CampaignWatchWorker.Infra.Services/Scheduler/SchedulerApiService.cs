@@ -1,12 +1,12 @@
 ﻿using CampaignWatchWorker.Domain.Models.Configuration;
-using CampaignWatchWorker.Domain.Models.Interfaces.Services;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Scheduler;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
 
 
 namespace CampaignWatchWorker.Infra.Services.Scheduler
 {
-    public class SchedulerApiService : ISchedulerService
+    public class SchedulerApiService : ISchedulerApiService
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<SchedulerApiService> _logger;

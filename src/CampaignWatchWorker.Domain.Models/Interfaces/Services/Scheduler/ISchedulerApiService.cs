@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CampaignWatchWorker.Infra.Services.Scheduler
+namespace CampaignWatchWorker.Domain.Models.Interfaces.Services.Scheduler
 {
     public interface ISchedulerApiService
     {

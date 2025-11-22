@@ -1,8 +1,8 @@
-﻿using CampaignWatchWorker.Application.Services.Interfaces;
-using CampaignWatchWorker.Domain.Models.Configuration;
+﻿using CampaignWatchWorker.Domain.Models.Configuration;
 using CampaignWatchWorker.Domain.Models.Entities.Alerts;
 using CampaignWatchWorker.Domain.Models.Entities.Campaigns;
 using CampaignWatchWorker.Domain.Models.Entities.Diagnostics;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Email;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Mail;
@@ -22,12 +22,14 @@ namespace CampaignWatchWorker.Infra.Services.Email
 
         public async Task SendAsync(AlertConfigurationModel rule, CampaignModel campaign, StepDiagnosticModel issue)
         {
+            var logPrefix = $"[{DateTime.Now:HH:mm:ss}][EmailDispatcher]";
+
             try
             {
                 using var message = new MailMessage();
 
                 message.From = new MailAddress(_settings.FromAddress, _settings.FromName);
-                
+
                 if (!string.IsNullOrEmpty(rule.Recipient))
                 {
                     foreach (var email in rule.Recipient.Split(';'))
@@ -39,6 +41,7 @@ namespace CampaignWatchWorker.Infra.Services.Email
                 else
                 {
                     _logger.LogWarning("Regra de alerta {RuleId} sem destinatário configurado.", rule.Id);
+                    Console.WriteLine($"{logPrefix} ⚠️ Regra de alerta {rule.Id} sem destinatário configurado. Email não enviado.");
                     return;
                 }
 
@@ -58,14 +61,19 @@ namespace CampaignWatchWorker.Infra.Services.Email
                     client.UseDefaultCredentials = false;
                 }
 
+                Console.WriteLine($"{logPrefix} Tentando enviar email para: {rule.Recipient} via SMTP {_settings.Host}:{_settings.Port}...");
+
                 await client.SendMailAsync(message);
 
                 _logger.LogInformation("📧 Email enviado para {Recipient}. Regra: {RuleName}. Erro: {Error}",
                     rule.Recipient, rule.Name, issue.Message);
+
+                Console.WriteLine($"{logPrefix} 📧 Email enviado com sucesso para: {rule.Recipient}. Regra: {rule.Name}");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Falha ao enviar email SMTP. Host: {Host}. Destinatário: {Recipient}", _settings.Host, rule.Recipient);
+                Console.WriteLine($"{logPrefix} ❌ Falha ao enviar email SMTP: {ex.Message}");
             }
         }
 

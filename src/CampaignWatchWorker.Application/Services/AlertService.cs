@@ -6,6 +6,8 @@ using CampaignWatchWorker.Domain.Models.Enums;
 using CampaignWatchWorker.Domain.Models.Enums.Alerts;
 using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Repositories.Alerts;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Email;
+using CampaignWatchWorker.Domain.Models.Interfaces.Services.Webhook;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 

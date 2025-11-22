@@ -86,18 +86,37 @@ namespace CampaignWatchWorker.Worker
             try
             {
                 var body = ea.Body.ToArray();
-                var jsonMessage = Encoding.UTF8.GetString(body);
 
+                if (body.Length == 0)
+                {
+                    Console.WriteLine($"[{timestamp}] 🗑️ Mensagem VAZIA recebida (Tag: {ea.DeliveryTag}). Descartando.");
+                    _channel.BasicNack(ea.DeliveryTag, false, requeue: false);
+                    return;
+                }
+
+                var jsonMessage = Encoding.UTF8.GetString(body);
                 Console.WriteLine($"[{timestamp}] 📨 Mensagem recebida (Tag: {ea.DeliveryTag}). Payload size: {body.Length} bytes.");
 
-                var messageData = JsonSerializer.Deserialize<ProjectQueueMessage>(jsonMessage);
+                ProjectQueueMessage? messageData = null;
+
+                try
+                {
+                    messageData = JsonSerializer.Deserialize<ProjectQueueMessage>(jsonMessage);
+                }
+                catch (JsonException jsonEx)
+                {
+                    Console.WriteLine($"[{timestamp}] ⚠️ JSON Inválido: {jsonEx.Message}. Descartando mensagem.");
+                    _logger.LogError(jsonEx, "JSON Inválido recebido.");
+                    _channel.BasicNack(ea.DeliveryTag, false, requeue: false);
+                    return;
+                }
 
                 if (messageData == null || string.IsNullOrEmpty(messageData.ClientName) || string.IsNullOrEmpty(messageData.ProjectId))
                 {
                     _logger.LogWarning("Mensagem inválida descartada: {Message}", jsonMessage);
-                    Console.WriteLine($"[{timestamp}] ⚠️ Mensagem inválida descartada (Dados incompletos). JSON: {jsonMessage}");
+                    Console.WriteLine($"[{timestamp}] ⚠️ Mensagem incompleta (Faltando Client ou ProjectId). Descartando.");
 
-                    _channel.BasicNack(ea.DeliveryTag, false, false);
+                    _channel.BasicNack(ea.DeliveryTag, false, requeue: false);
                     return;
                 }
 
@@ -112,9 +131,9 @@ namespace CampaignWatchWorker.Worker
                     if (client == null)
                     {
                         _logger.LogError("Cliente '{ClientName}' não encontrado.", messageData.ClientName);
-                        Console.WriteLine($"[{timestamp}] ❌ Cliente '{messageData.ClientName}' não encontrado na configuração. Mensagem rejeitada.");
+                        Console.WriteLine($"[{timestamp}] ❌ Cliente '{messageData.ClientName}' não encontrado. Mensagem rejeitada.");
 
-                        _channel.BasicNack(ea.DeliveryTag, false, false);
+                        _channel.BasicNack(ea.DeliveryTag, false, requeue: false); // Não reenfileira se o cliente não existe
                         return;
                     }
 
@@ -133,10 +152,15 @@ namespace CampaignWatchWorker.Worker
             }
             catch (Exception ex)
             {
+                // Erros genéricos de processamento (banco caiu, etc) podem ser reenfileirados
                 _logger.LogError(ex, "Erro ao processar mensagem.");
-                Console.WriteLine($"[{timestamp}] 💥 Erro no processamento da mensagem: {ex.Message}. Enviando NACK (Requeue).");
+                Console.WriteLine($"[{timestamp}] 💥 Erro no processamento: {ex.Message}. Enviando NACK (Requeue).");
 
-                _channel.BasicNack(ea.DeliveryTag, false, true);
+                // Aqui mantemos o requeue=true para tentar novamente se for um erro transiente
+                _channel.BasicNack(ea.DeliveryTag, false, requeue: true);
+
+                // Pequeno delay para não spamar o log se o banco estiver fora
+                await Task.Delay(1000);
             }
         }
 
