@@ -47,42 +47,7 @@ namespace CampaignWatchWorker.Infra.Campaign.Services
             return await collection.Find(x => x.Id == campaignObjectId.ToString()).FirstOrDefaultAsync();
         }
         
-        public async Task<IEnumerable<CampaignReadModel>> GetDiscoverableCampaignsAsync()
-        {
-            var db = _factory.GetDatabase();
-            var collection = db.GetCollection<CampaignReadModel>("Campaign");
-
-            var filterBuilder = Builders<CampaignReadModel>.Filter;
-
-            // Filtro base: Apenas campanhas ativas e não deletadas
-            var activeFilter = filterBuilder.Eq(x => x.IsActive, true) &
-                               filterBuilder.Eq(x => x.IsDeleted, false);
-
-            // Filtro 1: Campanhas que exigem monitoramento ATIVO
-            // Inclui apenas campanhas que estão de fato rodando ou agendadas
-            var statusFilter = filterBuilder.In(x => x.Status,
-                new[]
-                {
-                    (int)CampaignStatusEnum.Executing,
-                    (int)CampaignStatusEnum.Scheduled
-                });
-
-            // Filtro 2: Campanhas que exigem uma ÚLTIMA VERIFICAÇÃO
-            // Inclui campanhas que mudaram para um estado final nos últimos 3 dias
-            var recentFinishedFilter = filterBuilder.In(x => x.Status,
-                new[]
-                {
-                    (int)CampaignStatusEnum.Completed,
-                    (int)CampaignStatusEnum.Error,
-                    (int)CampaignStatusEnum.Canceled,   
-                    (int)CampaignStatusEnum.Canceling
-                }) & filterBuilder.Gte(x => x.ModifiedAt, DateTime.UtcNow.AddDays(-30));
-
-
-            var finalFilter = activeFilter & (statusFilter | recentFinishedFilter);
-
-            return await collection.Find(finalFilter).ToListAsync();
-        }
+        
 
         public async Task<IEnumerable<CampaignReadModel>> GetCampaignsByProjectAsync(string projectId)
         {

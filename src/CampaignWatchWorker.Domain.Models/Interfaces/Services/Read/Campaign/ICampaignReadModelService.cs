@@ -7,7 +7,6 @@ namespace CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign
         Task<IEnumerable<CampaignReadModel>> GetCampaigns();
         Task<IEnumerable<ExecutionReadModel>> GetExecutionsByCampaign(string campaignId);
         Task<CampaignReadModel> GetCampaignById(string campaignId);
-        Task<IEnumerable<CampaignReadModel>> GetDiscoverableCampaignsAsync();
         Task<IEnumerable<CampaignReadModel>> GetCampaignsByProjectAsync(string projectId);
     }
 }

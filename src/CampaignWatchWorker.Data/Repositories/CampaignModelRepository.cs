@@ -25,6 +25,13 @@ namespace CampaignWatchWorker.Data.Repositories
                 workerIndexKeys,
                 new CreateIndexOptions { Name = "Worker_Monitoring_Query" });
 
+            var projectIndexKeys = Builders<CampaignModel>.IndexKeys
+                .Ascending(x => x.ClientName)
+                .Ascending(x => x.ProjectId);
+            var projectIndexModel = new CreateIndexModel<CampaignModel>(
+                projectIndexKeys,
+                new CreateIndexOptions { Name = "Client_Project_Query" });
+
             CreateIndexesAsync(new List<CreateIndexModel<CampaignModel>> { uniqueIndexModel, workerIndexModel }).GetAwaiter().GetResult();
         }
 
@@ -96,6 +103,31 @@ namespace CampaignWatchWorker.Data.Repositories
             );
 
             return await _collection.Find(filter).ToListAsync();
+        }
+        public async Task<List<string>> GetIdsByProjectIdAsync(string clientName, string projectId)
+        {
+            var filter = Builders<CampaignModel>.Filter.And(
+                Builders<CampaignModel>.Filter.Eq(x => x.ClientName, clientName),
+                Builders<CampaignModel>.Filter.Eq(x => x.ProjectId, projectId)
+            );
+
+            var projection = Builders<CampaignModel>.Projection.Include(x => x.IdCampaign);
+
+            var result = await _collection
+                .Find(filter)
+                .Project(projection)
+                .ToListAsync();
+
+            return result.Select(doc => doc["IdCampaign"].AsString).ToList();
+        }
+        public async Task DeleteManyAsync(string clientName, IEnumerable<string> idsToDelete)
+        {
+            var filter = Builders<CampaignModel>.Filter.And(
+                Builders<CampaignModel>.Filter.Eq(x => x.ClientName, clientName),
+                Builders<CampaignModel>.Filter.In(x => x.IdCampaign, idsToDelete)
+            );
+
+            await _collection.DeleteManyAsync(filter);
         }
     }
 }

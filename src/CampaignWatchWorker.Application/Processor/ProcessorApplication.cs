@@ -44,28 +44,54 @@ namespace CampaignWatchWorker.Application.Processor
 
             try
             {
-                // 1. Busca todas as campanhas do projeto na origem (Read Model)
-                // Nota: Você precisa garantir que o método GetCampaignsByProjectAsync existe na interface ICampaignReadModelService
                 var sourceCampaigns = await _readService.GetCampaignsByProjectAsync(message.ProjectId);
+                var sourceList = sourceCampaigns?.ToList() ?? new List<CampaignReadModel>();
 
-                if (sourceCampaigns == null || !sourceCampaigns.Any())
+                _logger.LogInformation("[{Client}] Encontradas {Count} campanhas na origem.", message.ClientName, sourceList.Count);
+
+                await CleanUpZombieCampaignsAsync(message.ClientName, message.ProjectId, sourceList);
+
+                if (!sourceList.Any()) return;
+
+                var parallelOptions = new ParallelOptions
                 {
-                    _logger.LogWarning("[{Client}] Nenhuma campanha encontrada para o projeto {ProjectId}.", message.ClientName, message.ProjectId);
-                    return;
-                }
+                    MaxDegreeOfParallelism = 10,
+                    CancellationToken = CancellationToken.None
+                };
 
-                _logger.LogInformation("[{Client}] Sincronizando {Count} campanhas encontradas...", message.ClientName, sourceCampaigns.Count());
-
-                // 2. Itera sobre cada campanha para sincronização e análise
-                foreach (var sourceCampaign in sourceCampaigns)
+                await Parallel.ForEachAsync(sourceList, parallelOptions, async (sourceCampaign, token) =>
                 {
                     await SyncAndAnalyzeCampaignAsync(sourceCampaign);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "[{Client}] Erro fatal ao processar projeto {ProjectId}", message.ClientName, message.ProjectId);
+                throw;
+            }
+        }
+
+        private async Task CleanUpZombieCampaignsAsync(string clientName, string projectId, List<CampaignReadModel> sourceCampaigns)
+        {
+            try
+            {
+                var sourceIds = sourceCampaigns.Select(c => c.Id).ToHashSet();
+
+                var localIds = await _campaignRepository.GetIdsByProjectIdAsync(clientName, projectId);
+
+                var zombiesToDelete = localIds.Where(id => !sourceIds.Contains(id)).ToList();
+
+                if (zombiesToDelete.Any())
+                {
+                    _logger.LogInformation("[{Client}] Removendo {Count} campanhas obsoletas (Zumbis) do projeto {ProjectId}...",
+                        clientName, zombiesToDelete.Count, projectId);
+
+                    await _campaignRepository.DeleteManyAsync(clientName, zombiesToDelete);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogCritical(ex, "[{Client}] Erro fatal ao processar escopo do projeto {ProjectId}", message.ClientName, message.ProjectId);
-                throw; // Relança para que o Worker possa tratar (Nack/Retry)
+                _logger.LogError(ex, "[{Client}] Falha ao limpar campanhas zumbis do projeto {ProjectId}", clientName, projectId);
             }
         }
 
@@ -74,42 +100,34 @@ namespace CampaignWatchWorker.Application.Processor
             var clientName = _tenantContext.Client.Name;
             try
             {
-                // --- Passo A: Mapeamento e Sincronização (Upsert) ---
                 var campaignModel = _mapper.MapToCampaignModel(source);
 
-                // Busca a versão atual no banco de persistência para preservar estados de monitoramento
                 var existingCampaign = await _campaignRepository.GetCampaignByIdAsync(clientName, source.Id);
 
                 if (existingCampaign != null)
                 {
-                    campaignModel.Id = existingCampaign.Id; // Mantém o ObjectId do Mongo
+                    campaignModel.Id = existingCampaign.Id;
                     campaignModel.FirstMonitoringAt = existingCampaign.FirstMonitoringAt;
                     campaignModel.CreatedAt = existingCampaign.CreatedAt;
 
-                    // Se o status da campanha não mudou, preservamos o status do monitoramento e agendamento
                     if (campaignModel.StatusCampaign == existingCampaign.StatusCampaign)
                     {
                         campaignModel.MonitoringStatus = existingCampaign.MonitoringStatus;
                         campaignModel.NextExecutionMonitoring = existingCampaign.NextExecutionMonitoring;
-                        campaignModel.HealthStatus = existingCampaign.HealthStatus; // Preserva histórico de saúde
+                        campaignModel.HealthStatus = existingCampaign.HealthStatus;
                     }
                     else
                     {
-                        // Status mudou (ex: de Executing para Completed), reinicia lógica de monitoramento
                         SetInitialMonitoringState(campaignModel);
                     }
                 }
                 else
                 {
-                    // Campanha nova
                     SetInitialMonitoringState(campaignModel);
                 }
 
-                // Salva a campanha (cria ou atualiza)
                 await _campaignRepository.UpdateCampaignAsync(campaignModel);
 
-                // --- Passo B: Análise de Execuções (Se aplicável) ---
-                // Só analisamos se a campanha estiver ativa e não deletada
                 if (campaignModel.IsActive && !campaignModel.IsDeleted)
                 {
                     await AnalyzeExecutionsAsync(campaignModel);
@@ -117,15 +135,13 @@ namespace CampaignWatchWorker.Application.Processor
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[{Client}] Falha ao sincronizar/analisar campanha {CampaignId}", clientName, source.Id);
+                _logger.LogError(ex, "[{Client}] Erro ao processar campanha {CampaignId}", clientName, source.Id);
             }
         }
-
         private async Task AnalyzeExecutionsAsync(CampaignModel campaign)
         {
             try
             {
-                // Busca execuções na origem
                 var executionsRead = await _readService.GetExecutionsByCampaign(campaign.IdCampaign);
                 var executionModels = new List<ExecutionModel>();
                 int errorExecutionCount = 0;
@@ -136,14 +152,10 @@ namespace CampaignWatchWorker.Application.Processor
                     {
                         try
                         {
-                            // Busca dados consolidados dos canais (Deliverability)
                             var channelData = await _channelService.GetConsolidatedChannelDataAsync(executionRead.ExecutionId.ToString());
-
-                            // Mapeia execução
                             var executionModel = _mapper.MapToExecutionModel(executionRead, campaign.Id, channelData);
                             if (executionModel == null) continue;
 
-                            // Analisa saúde da execução (Steps)
                             var diagnostic = await _analyzer.AnalyzeExecutionAsync(executionModel, campaign);
 
                             executionModel.HasMonitoringErrors = diagnostic.OverallHealth == HealthStatusEnum.Error ||
@@ -151,41 +163,33 @@ namespace CampaignWatchWorker.Application.Processor
 
                             if (executionModel.HasMonitoringErrors) errorExecutionCount++;
 
-                            // Persiste execução
                             await _executionRepository.UpdateExecutionAsync(executionModel);
                             executionModels.Add(executionModel);
 
-                            // Dispara alertas se necessário
                             await _alertService.ProcessAlertsAsync(campaign, diagnostic);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "[{Client}] Erro ao processar execução {ExecutionId}", campaign.ClientName, executionRead.ExecutionId);
+                            _logger.LogError(ex, "[{Client}] Erro na execução {ExecId}", campaign.ClientName, executionRead.ExecutionId);
                         }
                     }
                 }
 
-                // Atualiza status consolidado da Campanha após processar todas as execuções
                 var campaignHealth = await _analyzer.AnalyzeCampaignHealthAsync(campaign, executionModels);
-
                 campaign.HealthStatus = campaignHealth;
                 campaign.LastCheckMonitoring = DateTime.UtcNow;
                 campaign.ExecutionsWithErrors = errorExecutionCount;
                 campaign.TotalExecutionsProcessed = executionModels.Count;
 
-                // Recalcula próximo agendamento baseado no novo estado
                 (var newStatus, var nextCheck) = CalculateNextCheck(campaign);
                 campaign.MonitoringStatus = newStatus;
                 campaign.NextExecutionMonitoring = nextCheck;
 
                 await _campaignRepository.UpdateCampaignAsync(campaign);
-
-                _logger.LogInformation("[{Client}] Campanha {Id} analisada. Status: {Status}. Próx: {Next}",
-                    campaign.ClientName, campaign.IdCampaign, campaign.MonitoringStatus, campaign.NextExecutionMonitoring);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[{Client}] Erro ao realizar análise de execuções da campanha {Id}", campaign.ClientName, campaign.IdCampaign);
+                _logger.LogError(ex, "[{Client}] Erro na análise de saúde da campanha {Id}", campaign.ClientName, campaign.IdCampaign);
             }
         }
 
@@ -203,10 +207,8 @@ namespace CampaignWatchWorker.Application.Processor
             {
                 if (campaign.StatusCampaign == CampaignStatusEnum.Completed)
                 {
-                    // Se completou mas ainda tem pendência técnica, aguarda um pouco
                     if (campaign.HealthStatus?.HasPendingExecution == true)
                         return (MonitoringStatusEnum.InProgress, now.AddMinutes(10));
-
                     return (MonitoringStatusEnum.Completed, null);
                 }
 
@@ -269,7 +271,7 @@ namespace CampaignWatchWorker.Application.Processor
                     campaignModel.NextExecutionMonitoring = now;
                 }
             }
-            else // Recorrente
+            else
             {
                 campaignModel.MonitoringStatus = MonitoringStatusEnum.InProgress;
                 campaignModel.NextExecutionMonitoring = now;

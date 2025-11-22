@@ -36,7 +36,6 @@ namespace CampaignWatchWorker.Worker
             try
             {
                 InitializeConsumer();
-
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
@@ -44,7 +43,7 @@ namespace CampaignWatchWorker.Worker
             }
             catch (Exception ex)
             {
-                _logger.LogCritical(ex, "Falha fatal no Worker. O serviço será encerrado.");
+                _logger.LogCritical(ex, "Falha fatal no Worker.");
             }
         }
 
@@ -66,7 +65,7 @@ namespace CampaignWatchWorker.Worker
 
             _channel.BasicConsume(queue: _settings.QueueName, autoAck: false, consumer: consumer);
 
-            _logger.LogInformation("Consumer registrado com sucesso. Aguardando mensagens...");
+            _logger.LogInformation("Consumer registrado. Aguardando mensagens...");
         }
 
         private async Task ProcessMessageAsync(object model, BasicDeliverEventArgs ea)
@@ -76,13 +75,11 @@ namespace CampaignWatchWorker.Worker
                 var body = ea.Body.ToArray();
                 var jsonMessage = Encoding.UTF8.GetString(body);
 
-                _logger.LogDebug("Mensagem recebida: {Message}", jsonMessage);
-
                 var messageData = JsonSerializer.Deserialize<ProjectQueueMessage>(jsonMessage);
 
                 if (messageData == null || string.IsNullOrEmpty(messageData.ClientName) || string.IsNullOrEmpty(messageData.ProjectId))
                 {
-                    _logger.LogWarning("Mensagem inválida descartada (Dados incompletos): {Message}", jsonMessage);
+                    _logger.LogWarning("Mensagem inválida descartada: {Message}", jsonMessage);
                     _channel.BasicNack(ea.DeliveryTag, false, false);
                     return;
                 }
@@ -97,7 +94,7 @@ namespace CampaignWatchWorker.Worker
 
                     if (client == null)
                     {
-                        _logger.LogError("Cliente '{ClientName}' não encontrado na configuração. Mensagem descartada.", messageData.ClientName);
+                        _logger.LogError("Cliente '{ClientName}' não encontrado.", messageData.ClientName);
                         _channel.BasicNack(ea.DeliveryTag, false, false);
                         return;
                     }
@@ -106,6 +103,7 @@ namespace CampaignWatchWorker.Worker
                     tenantContext.SetClient(client);
 
                     var processor = scope.ServiceProvider.GetRequiredService<IProcessorApplication>();
+
                     await processor.ProcessProjectScopeAsync(messageData);
                 }
 
@@ -113,7 +111,7 @@ namespace CampaignWatchWorker.Worker
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao processar mensagem. Reenfileirando...");
+                _logger.LogError(ex, "Erro ao processar mensagem.");
                 _channel.BasicNack(ea.DeliveryTag, false, true);
             }
         }
