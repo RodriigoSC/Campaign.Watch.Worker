@@ -3,6 +3,7 @@ using CampaignWatchWorker.Data.Factories;
 using CampaignWatchWorker.Data.Factories.Common;
 using CampaignWatchWorker.Data.Resolver;
 using CampaignWatchWorker.Data.Services;
+using CampaignWatchWorker.Domain.Models.Configuration;
 using CampaignWatchWorker.Domain.Models.Interfaces;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services;
 using CampaignWatchWorker.Domain.Models.Interfaces.Services.Read.Campaign;
@@ -11,12 +12,12 @@ using CampaignWatchWorker.Infra.Campaign.Resolver;
 using CampaignWatchWorker.Infra.Campaign.Services;
 using CampaignWatchWorker.Infra.MultiTenant;
 using DTM_Logging.Ioc;
-using DTM_MessageQueue.RabbitMQ.Factory;
 using DTM_Vault.Data;
 using DTM_Vault.Data.Factory;
 using DTM_Vault.Data.KeyValue;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using RabbitMQ.Client; 
 
 namespace CampaignWatchWorker.Infra.Ioc
 {
@@ -24,55 +25,87 @@ namespace CampaignWatchWorker.Infra.Ioc
     {
         public static async Task StartIoC(IServiceCollection services, IConfiguration configuration, string applicationName)
         {
+            Console.WriteLine("[Bootstrap] 1. Iniciando DI...");
+
             var environment = ValidateIfNull(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "ASPNETCORE_ENVIRONMENT");
             var conn_string_vault = ValidateIfNull(Environment.GetEnvironmentVariable("CONN_STRING_VAULT"), "CONN_STRING_VAULT");
             var user_vault = ValidateIfNull(Environment.GetEnvironmentVariable("USER_VAULT"), "USER_VAULT");
             var pass_vault = ValidateIfNull(Environment.GetEnvironmentVariable("PASS_VAULT"), "PASS_VAULT");
             var pathLog = ValidateIfNull(configuration["PathLog"], "pathLog");
 
-            services.AddSingleton<IVaultFactory>(_ => VaultFactory.CreateInstance(conn_string_vault, user_vault, pass_vault));
+            Console.WriteLine($"[Bootstrap] 2. Conectando ao Vault ({conn_string_vault})...");
+            var vaultFactory = VaultFactory.CreateInstance(conn_string_vault, user_vault, pass_vault);
+            var vaultService = new VaultService(vaultFactory);
+
+            services.AddSingleton<IVaultFactory>(vaultFactory);
             services.AddTransient<IVaultService, VaultService>();
+
+            var vaultKeyPath = $"monitoring/{environment}/data/keys";
+
+            Console.WriteLine("[Bootstrap] 3. Buscando credenciais RabbitMQ...");
+            var rabbitHost = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.host");
+            var rabbitUser = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.user");
+            var rabbitPass = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.pass");
+            var rabbitVHost = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.virtualhost");
+
+            var queueName = await vaultService.GetKeyAsync(vaultKeyPath, "RabbitMQ.QueueName");
+
+            if (string.IsNullOrEmpty(queueName))
+            {
+                Console.WriteLine("[Bootstrap] AVISO: 'RabbitMQ.QueueName' não encontrado no Vault. Usando 'campaign.monitoring.global'.");
+                queueName = "campaign.monitoring.global";
+            }
+            else
+            {
+                Console.WriteLine($"[Bootstrap] Fila configurada: {queueName}");
+            }
+
+            services.AddSingleton<IConnection>(sp =>
+            {
+                var factory = new ConnectionFactory
+                {
+                    HostName = rabbitHost,
+                    UserName = rabbitUser,
+                    Password = rabbitPass,
+                    VirtualHost = rabbitVHost,
+                    DispatchConsumersAsync = true
+                };
+
+                return factory.CreateConnection();
+            });
+
+            services.AddSingleton(new WorkerSettings
+            {
+                QueueName = queueName,
+                PrefetchCount = 5
+            });
 
             services.AddScoped<ITenantContext, TenantContext>();
 
-            services.AddSingleton(x =>
-            {
-                var rabbitHost = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.host");
-                var rabbitUser = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.user");
-                var rabbitVirtualhost = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.virtualhost");
-
-                return DTM_RabbitMqFactory.CreateInstance($@"amqp://{rabbitUser?.Result}:{x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.pass")?.Result}@{rabbitHost?.Result}/{rabbitVirtualhost?.Result}".ToString());
-            });
-
             services.AddSingleton<IMongoDbFactory>(sp =>
             {
-                var vaultService = sp.GetRequiredService<IVaultService>();
-                return new MongoDbFactory(vaultService, environment);
+                var vs = sp.GetRequiredService<IVaultService>();
+                return new MongoDbFactory(vs, environment);
             });
 
             services.AddSingleton<IPersistenceMongoFactory>(sp =>
             {
                 var mongoFactory = sp.GetRequiredService<IMongoDbFactory>();
-                var vaultService = sp.GetRequiredService<IVaultService>();
-                var dbName = vaultService.GetKeyAsync($"monitoring/{environment}/data/keys", "MongoDB.Persistence.database").GetAwaiter().GetResult();
+                var vs = sp.GetRequiredService<IVaultService>();
+                var dbName = vs.GetKeyAsync(vaultKeyPath, "MongoDB.Persistence.database").GetAwaiter().GetResult();
                 return new PersistenceMongoFactory(mongoFactory, dbName);
             });
 
             services.AddScoped<ICampaignMongoFactory, CampaignMongoFactory>();
-
             services.AddSingleton<IClientConfigService, ClientConfigService>();
-
             services.AddScoped<IChannelReadModelService, ChannelReadModelService>();
-
             services.AddRepositoryData();
-
             services.AddCampaignRepository();
-
             services.AddApplication();
-
             services.AddFileLogger(pathLog, applicationName, environment);
-        }
 
+            Console.WriteLine("[Bootstrap] 4. Configuração concluída.");
+        }
         private static string ValidateIfNull(string? value, string? name)
         {
             if (string.IsNullOrEmpty(value))

@@ -9,7 +9,8 @@
             "USER_VAULT": "monitoring-dev",
             "PASS_VAULT": "monitoring-dev",
             "TENANT": "6445d693b443206381ab91c2",
-            "PathLog": "C:\\Users\\rscosta\\Desktop\\LOGS"
+            "PathLog": "C:\\Users\\rscosta\\Desktop\\LOGS",
+            "RabbitMQ.QueueName": "MONITORING_CAMPAIGN"
           }
         },
         "Docker": {

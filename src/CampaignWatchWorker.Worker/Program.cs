@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Reflection;
 
 namespace CampaignWatchWorker.Worker
@@ -21,28 +22,29 @@ namespace CampaignWatchWorker.Worker
                         .AddJsonFile($"appsettings.{environment}.json", true, true)
                         .AddEnvironmentVariables();
                 })
-                .ConfigureServices(async (hostContext, services) =>
+                /*.ConfigureLogging((hostContext, logging) =>
+                {
+                    logging.AddConfiguration(hostContext.Configuration.GetSection("Logging"));
+                    logging.AddConsole();
+                })*/
+                .ConfigureServices((hostContext, services) =>
                 {
                     var configuration = hostContext.Configuration;
-
                     services.AddSingleton<IConfiguration>(configuration);
+                    Bootstrap.StartIoC(services, configuration, Assembly.GetExecutingAssembly().GetName().Name).GetAwaiter().GetResult();
 
-                    await Bootstrap.StartIoC(services, configuration, Assembly.GetExecutingAssembly().GetName().Name);
-
-                    //services.AddHostedService<MultiTenantPollingWorker>();
                     services.AddHostedService<SingleQueueRabbitWorker>();
                 });
 
             await builder.RunConsoleAsync();
 
-            Console.WriteLine("Parando excecução...");
+            Console.WriteLine("Parando execução...");
         }
 
         private static string ValidateIfNull(string? value, string? name)
         {
             if (string.IsNullOrEmpty(value))
                 throw new ArgumentNullException($"{name} cannot be null");
-
             return value;
         }
     }
