@@ -11,6 +11,7 @@ using CampaignWatchWorker.Infra.Campaign.Resolver;
 using CampaignWatchWorker.Infra.Campaign.Services;
 using CampaignWatchWorker.Infra.MultiTenant;
 using DTM_Logging.Ioc;
+using DTM_MessageQueue.RabbitMQ.Factory;
 using DTM_Vault.Data;
 using DTM_Vault.Data.Factory;
 using DTM_Vault.Data.KeyValue;
@@ -33,6 +34,15 @@ namespace CampaignWatchWorker.Infra.Ioc
             services.AddTransient<IVaultService, VaultService>();
 
             services.AddScoped<ITenantContext, TenantContext>();
+
+            services.AddSingleton(x =>
+            {
+                var rabbitHost = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.host");
+                var rabbitUser = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.user");
+                var rabbitVirtualhost = x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.virtualhost");
+
+                return DTM_RabbitMqFactory.CreateInstance($@"amqp://{rabbitUser?.Result}:{x.GetService<IVaultService>()?.GetKeyAsync($"monitoring/{environment}/data/keys", "RabbitMQ.pass")?.Result}@{rabbitHost?.Result}/{rabbitVirtualhost?.Result}".ToString());
+            });
 
             services.AddSingleton<IMongoDbFactory>(sp =>
             {

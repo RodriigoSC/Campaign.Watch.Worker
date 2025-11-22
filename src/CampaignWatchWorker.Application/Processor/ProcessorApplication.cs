@@ -22,6 +22,7 @@ namespace CampaignWatchWorker.Application.Processor
         private readonly IAlertService _alertService; 
         private readonly ILogger<ProcessorApplication> _logger;
 
+
         public ProcessorApplication(
             ICampaignReadModelService campaignReadModelService,
             ICampaignModelRepository campaignModelRepository,
@@ -66,6 +67,84 @@ namespace CampaignWatchWorker.Application.Processor
             {
                 await ProcessSingleCampaignAsync(campaignModel);
             }
+        }
+
+        public async Task DiscoverNewCampaignsAsync()
+        {
+            var clientName = _tenantContext.Client.Name;
+            _logger.LogInformation("[{ClientName}] Iniciando descoberta de campanhas ativas na origem.", clientName);
+            Console.WriteLine($"[{clientName}] Iniciando descoberta de campanhas ativas na origem.");
+
+            var discoverableCampaigns = await _campaignReadModelService.GetDiscoverableCampaignsAsync();
+
+            if (!discoverableCampaigns.Any())
+            {
+                _logger.LogInformation("[{ClientName}] Nenhuma campanha ativa encontrada na origem.", clientName);
+                Console.WriteLine($"[{clientName}] Nenhuma campanha ativa encontrada na origem.");
+                return;
+            }
+
+            _logger.LogInformation("[{ClientName}] Encontradas {Count} campanhas ativas na origem. Sincronizando...", clientName, discoverableCampaigns.Count());
+            Console.WriteLine($"[{clientName}] Encontradas {discoverableCampaigns.Count()} campanhas ativas na origem. Sincronizando...");
+
+            foreach (var campaignReadModel in discoverableCampaigns)
+            {
+                try
+                {
+                    var existingCampaign = await _campaignModelRepository.GetCampaignByIdAsync(clientName, campaignReadModel.Id);
+
+                    if (existingCampaign != null &&
+                        (existingCampaign.MonitoringStatus == MonitoringStatusEnum.Completed ||
+                         existingCampaign.MonitoringStatus == MonitoringStatusEnum.Failed))
+                    {
+                        if (existingCampaign.StatusCampaign == (CampaignStatusEnum)campaignReadModel.Status)
+                        {
+                            continue;
+                        }
+
+                        _logger.LogInformation("[{ClientName}] Campanha {CampaignId} mudou de status na origem. Reativando monitoramento.", clientName, campaignReadModel.Id);
+                    }
+
+                    var campaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
+
+                    if (existingCampaign != null)
+                    {
+                        campaignModel.Id = existingCampaign.Id;
+                        campaignModel.FirstMonitoringAt = existingCampaign.FirstMonitoringAt;
+                        campaignModel.CreatedAt = existingCampaign.CreatedAt;
+                    }
+
+                    SetInitialMonitoringState(campaignModel);
+
+                    await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[{ClientName}] Falha ao sincronizar campanha {CampaignId} da origem.", clientName, campaignReadModel.Id);
+                    Console.WriteLine($"[{clientName}] Falha ao sincronizar campanha {campaignReadModel.Id} da origem: {ex}");
+                }
+            }
+        }
+
+        public async Task ProcessCampaignByEventAsync(string campaignId)
+        {
+            var clientName = _tenantContext.Client.Name;
+            _logger.LogInformation("[{ClientName}] Evento recebido da fila para campanha ID: {CampaignId}", clientName, campaignId);
+
+            // 1. Buscamos a campanha no repositório local (MongoDB Persistence)
+            // Precisamos garantir que temos os dados mais recentes de configuração dela
+            var campaignModel = await _campaignModelRepository.GetCampaignByIdAsync(clientName, campaignId);
+
+            if (campaignModel == null)
+            {
+                _logger.LogWarning("[{ClientName}] Campanha {CampaignId} recebida na fila mas não encontrada no banco de monitoramento. Tentando sincronizar...", clientName, campaignId);
+                                
+                //await DiscoverSingleCampaignAsync(campaignId); 
+                return;
+            }
+
+            // 2. Reutilizamos a lógica de processamento existente
+            await ProcessSingleCampaignAsync(campaignModel);
         }
 
         private async Task ProcessSingleCampaignAsync(CampaignModel campaignModel)
@@ -177,8 +256,7 @@ namespace CampaignWatchWorker.Application.Processor
                 }
             }
         }
-
-        
+                
         private (MonitoringStatusEnum, DateTime?) CalculateNextCheck(CampaignModel campaign)
         {
             var now = DateTime.UtcNow;
@@ -246,64 +324,7 @@ namespace CampaignWatchWorker.Application.Processor
 
             return (MonitoringStatusEnum.Pending, now.AddMinutes(30));
         }
-
-        public async Task DiscoverNewCampaignsAsync()
-        {
-            var clientName = _tenantContext.Client.Name;
-            _logger.LogInformation("[{ClientName}] Iniciando descoberta de campanhas ativas na origem.", clientName);
-            Console.WriteLine($"[{clientName}] Iniciando descoberta de campanhas ativas na origem.");
-
-            var discoverableCampaigns = await _campaignReadModelService.GetDiscoverableCampaignsAsync();
-
-            if (!discoverableCampaigns.Any())
-            {
-                _logger.LogInformation("[{ClientName}] Nenhuma campanha ativa encontrada na origem.", clientName);
-                Console.WriteLine($"[{clientName}] Nenhuma campanha ativa encontrada na origem.");
-                return;
-            }
-
-            _logger.LogInformation("[{ClientName}] Encontradas {Count} campanhas ativas na origem. Sincronizando...", clientName, discoverableCampaigns.Count());
-            Console.WriteLine($"[{clientName}] Encontradas {discoverableCampaigns.Count()} campanhas ativas na origem. Sincronizando...");
-
-            foreach (var campaignReadModel in discoverableCampaigns)
-            {
-                try
-                {
-                    var existingCampaign = await _campaignModelRepository.GetCampaignByIdAsync(clientName, campaignReadModel.Id);
-                                        
-                    if (existingCampaign != null &&
-                        (existingCampaign.MonitoringStatus == MonitoringStatusEnum.Completed ||
-                         existingCampaign.MonitoringStatus == MonitoringStatusEnum.Failed))
-                    {                        
-                        if (existingCampaign.StatusCampaign == (CampaignStatusEnum)campaignReadModel.Status)
-                        {
-                            continue;
-                        }
-
-                        _logger.LogInformation("[{ClientName}] Campanha {CampaignId} mudou de status na origem. Reativando monitoramento.", clientName, campaignReadModel.Id);
-                    }
-
-                    var campaignModel = _campaignMapper.MapToCampaignModel(campaignReadModel);
-                    
-                    if (existingCampaign != null)
-                    {
-                        campaignModel.Id = existingCampaign.Id;
-                        campaignModel.FirstMonitoringAt = existingCampaign.FirstMonitoringAt;
-                        campaignModel.CreatedAt = existingCampaign.CreatedAt;
-                    }
-
-                    SetInitialMonitoringState(campaignModel);
-
-                    await _campaignModelRepository.UpdateCampaignAsync(campaignModel);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "[{ClientName}] Falha ao sincronizar campanha {CampaignId} da origem.", clientName, campaignReadModel.Id);
-                    Console.WriteLine($"[{clientName}] Falha ao sincronizar campanha {campaignReadModel.Id} da origem: {ex}");
-                }
-            }
-        }
-        
+          
         private void SetInitialMonitoringState(CampaignModel campaignModel)
         {
             var now = DateTime.UtcNow;

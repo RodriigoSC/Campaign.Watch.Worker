@@ -29,7 +29,8 @@ namespace CampaignWatchWorker.Worker
 
                     await Bootstrap.StartIoC(services, configuration, Assembly.GetExecutingAssembly().GetName().Name);
 
-                    services.AddHostedService<MultiTenantPollingWorker>();
+                    //services.AddHostedService<MultiTenantPollingWorker>();
+                    services.AddHostedService<SingleQueueRabbitWorker>();
                 });
 
             await builder.RunConsoleAsync();

@@ -2,8 +2,8 @@
 {
     public interface IProcessorApplication
     {
-        Task ProcessDueCampaignsForClientAsync();
-
         Task DiscoverNewCampaignsAsync();
+
+        Task ProcessCampaignByEventAsync(string campaignId);
     }
 }
